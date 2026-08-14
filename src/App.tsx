@@ -1,0 +1,515 @@
+import React, { useState, useEffect } from 'react';
+import { KpmbpEvent, EventCategory, ViewTab, RegistrationRecord } from './types';
+import { INITIAL_EVENTS } from './data/initialEvents';
+import { Navbar } from './components/Navbar';
+import { HeroSection } from './components/HeroSection';
+import { EventCard } from './components/EventCard';
+import { EventDetailModal } from './components/EventDetailModal';
+import { DontMissSidebar } from './components/DontMissSidebar';
+import { CalendarView } from './components/CalendarView';
+import { RegistrationModal } from './components/RegistrationModal';
+import { AdminPortal } from './components/AdminPortal';
+import { AdminPinModal } from './components/AdminPinModal';
+import { sortEventsByNearestDue } from './utils/calendar';
+import { Sparkles, Calendar as CalendarIcon, Filter, Flame, CheckCircle2, ShieldCheck, Bookmark, Lock, KeyRound } from 'lucide-react';
+
+export default function App() {
+  const [events, setEvents] = useState<KpmbpEvent[]>(() => {
+    try {
+      const saved = localStorage.getItem('kpmbp_events_v1');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {
+      // Fallback
+    }
+    return INITIAL_EVENTS;
+  });
+
+  const [savedEventIds, setSavedEventIds] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('kpmbp_saved_events');
+      if (saved) return JSON.parse(saved);
+    } catch {
+      // Fallback
+    }
+    return [];
+  });
+
+  const [currentTab, setCurrentTab] = useState<ViewTab>('discover');
+  const [selectedCategory, setSelectedCategory] = useState<EventCategory>('Semua');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showOnlySaved, setShowOnlySaved] = useState(false);
+
+  // Admin Access Security
+  const [isAdminUnlocked, setIsAdminUnlocked] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('kpmbp_admin_unlocked') === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const [isAdminPinOpen, setIsAdminPinOpen] = useState(false);
+  
+  // Modals
+  const [selectedEventForDetail, setSelectedEventForDetail] = useState<KpmbpEvent | null>(null);
+  const [selectedEventForRegistration, setSelectedEventForRegistration] = useState<KpmbpEvent | null>(null);
+
+  // Toast Notification
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Save events to local storage
+  useEffect(() => {
+    try {
+      localStorage.setItem('kpmbp_events_v1', JSON.stringify(events));
+    } catch {
+      // storage quota error
+    }
+  }, [events]);
+
+  // Save bookmarked events to local storage
+  useEffect(() => {
+    try {
+      localStorage.setItem('kpmbp_saved_events', JSON.stringify(savedEventIds));
+    } catch {
+      // storage quota error
+    }
+  }, [savedEventIds]);
+
+  // Save admin unlock status
+  useEffect(() => {
+    try {
+      localStorage.setItem('kpmbp_admin_unlocked', isAdminUnlocked ? 'true' : 'false');
+    } catch {
+      // storage quota error
+    }
+  }, [isAdminUnlocked]);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  const handleToggleSave = (eventId: string) => {
+    if (savedEventIds.includes(eventId)) {
+      setSavedEventIds(savedEventIds.filter((id) => id !== eventId));
+      showToast('Event telah dikeluarkan daripada simpanan.');
+    } else {
+      setSavedEventIds([...savedEventIds, eventId]);
+      showToast('Event berjaya disimpan dalam senarai semakan!');
+    }
+  };
+
+  const handleAdminPinSuccess = () => {
+    setIsAdminUnlocked(true);
+    setIsAdminPinOpen(false);
+    setCurrentTab('admin');
+    showToast('Akses Admin Mode Berjaya Disahkan!');
+  };
+
+  const handleToggleOffAdmin = () => {
+    setIsAdminUnlocked(false);
+    if (currentTab === 'admin') {
+      setCurrentTab('discover');
+    }
+    showToast('Admin Mode telah dimatikan (OFF).');
+  };
+
+  // Urgent events count
+  const urgentCount = events.filter(
+    (e) => e.status === 'Registration Closing Soon' || (e.seatsLeft !== undefined && e.seatsLeft <= 5)
+  ).length;
+
+  const openRegistrationCount = events.filter(
+    (e) => e.status === 'Registration Open' || e.status === 'Registration Closing Soon'
+  ).length;
+
+  // Filtered & Sorted Events (by nearest due date)
+  const filteredEvents = sortEventsByNearestDue(
+    events.filter((evt) => {
+      // Saved filter check
+      if (showOnlySaved && !savedEventIds.includes(evt.id)) {
+        return false;
+      }
+      // Category check
+      if (selectedCategory !== 'Semua' && evt.category !== selectedCategory) {
+        return false;
+      }
+      // Search query check
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const matchTitle = evt.title.toLowerCase().includes(q);
+        const matchDesc = evt.description.toLowerCase().includes(q);
+        const matchLoc = evt.location.toLowerCase().includes(q);
+        const matchOrg = evt.organiser.toLowerCase().includes(q);
+        const matchCat = evt.category.toLowerCase().includes(q);
+        const matchTags = evt.tags?.some((t) => t.toLowerCase().includes(q));
+        if (!matchTitle && !matchDesc && !matchLoc && !matchOrg && !matchCat && !matchTags) {
+          return false;
+        }
+      }
+      return true;
+    })
+  );
+
+  // Admin Actions
+  const handleCreateEvent = (newEventData: Omit<KpmbpEvent, 'id'>) => {
+    const created: KpmbpEvent = {
+      ...newEventData,
+      id: `kpmbp-evt-${Date.now()}`
+    };
+    setEvents((prev) => [created, ...prev]);
+    showToast('Acara baharu berjaya diterbitkan!');
+  };
+
+  const handleUpdateEvent = (updated: KpmbpEvent) => {
+    setEvents((prev) => prev.map((e) => (e.id === updated.id ? updated : e)));
+    showToast('Maklumat acara telah dikemaskini.');
+  };
+
+  const handleDeleteEvent = (id: string) => {
+    if (window.confirm('Adakah anda pasti mahu memadam acara ini?')) {
+      setEvents((prev) => prev.filter((e) => e.id !== id));
+      showToast('Acara telah dipadam.');
+    }
+  };
+
+  const handleRegistrationSuccess = (record: RegistrationRecord) => {
+    showToast(`Pendaftaran berjaya! Kod Pas Digital: ${record.id}`);
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-50 flex flex-col font-['Plus_Jakarta_Sans',sans-serif] text-slate-900 relative overflow-x-hidden selection:bg-indigo-500 selection:text-white">
+      
+      {/* Frosted Glass Background Ambient Glow Spheres */}
+      <div className="absolute top-[-150px] right-[-100px] w-[600px] h-[600px] bg-blue-200/50 rounded-full blur-[130px] opacity-60 pointer-events-none" />
+      <div className="absolute bottom-[-100px] left-[-100px] w-[500px] h-[500px] bg-indigo-200/50 rounded-full blur-[110px] opacity-50 pointer-events-none" />
+      <div className="absolute top-[35%] left-[25%] w-[450px] h-[450px] bg-purple-200/40 rounded-full blur-[120px] opacity-40 pointer-events-none" />
+
+      {/* Global Toast Message */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-2 text-xs font-bold animate-in slide-in-from-bottom-5 border border-slate-700">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
+
+      {/* Navigation Header */}
+      <Navbar
+        currentTab={currentTab}
+        onSelectTab={setCurrentTab}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        urgentCount={urgentCount}
+        isAdminUnlocked={isAdminUnlocked}
+        onOpenAdminPin={() => setIsAdminPinOpen(true)}
+        onToggleOffAdmin={handleToggleOffAdmin}
+      />
+
+      {/* Main Body Layout */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 z-10 flex flex-col gap-8">
+        
+        {/* DISCOVER TAB */}
+        {currentTab === 'discover' && (
+          <div className="space-y-8 animate-in fade-in duration-300">
+            
+            {/* Hero Section */}
+            <HeroSection
+              onSelectTab={setCurrentTab}
+              openCount={openRegistrationCount}
+              urgentCount={urgentCount}
+            />
+
+            {/* Split Grid Layout: Main Event Feed + Side Navigator */}
+            <div className="flex flex-col lg:flex-row gap-8 items-start">
+              
+              {/* Main Content Column */}
+              <section className="flex-1 w-full space-y-6">
+                
+                {/* Header & Category Pills */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/60 pb-3">
+                  <div>
+                    <h2 className="text-xs font-extrabold uppercase tracking-[0.2em] text-slate-400">
+                      AKAN DATANG DI KPMBP
+                    </h2>
+                    <p className="text-base font-extrabold text-slate-800">
+                      Temui Acara & Activity Terkini
+                    </p>
+                  </div>
+
+                  {/* Category Quick Selector */}
+                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+                    {(['Semua', 'Pertandingan', 'Bengkel', 'Sukan', 'Kebudayaan', 'Kerjaya'] as EventCategory[]).map((cat) => (
+                      <button
+                        key={cat}
+                        onClick={() => setSelectedCategory(cat)}
+                        className={`px-3 py-1 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
+                          selectedCategory === cat
+                            ? 'bg-indigo-600 text-white shadow-2xs'
+                            : 'bg-white/60 text-slate-600 border border-white/80 hover:bg-white'
+                        }`}
+                      >
+                        {cat}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Event Cards Grid */}
+                {filteredEvents.length === 0 ? (
+                  <div className="bg-white/60 backdrop-blur-xl border border-white/80 rounded-3xl p-10 text-center space-y-3">
+                    <Sparkles className="w-8 h-8 text-indigo-400 mx-auto" />
+                    <h3 className="text-base font-extrabold text-slate-800">Tiada event dijumpai</h3>
+                    <p className="text-xs text-slate-500">
+                      Cuba ubah carian, padam penapis, atau semak semula status simpanan event.
+                    </p>
+                    <button
+                      onClick={() => {
+                        setSelectedCategory('Semua');
+                        setSearchQuery('');
+                        setShowOnlySaved(false);
+                      }}
+                      className="px-4 py-2 bg-indigo-600 text-white text-xs font-bold rounded-xl shadow-xs"
+                    >
+                      Reset Penapis
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    {filteredEvents.map((event) => (
+                      <EventCard
+                        key={event.id}
+                        event={event}
+                        onViewDetails={setSelectedEventForDetail}
+                        onRegister={setSelectedEventForRegistration}
+                        isSaved={savedEventIds.includes(event.id)}
+                        onToggleSave={handleToggleSave}
+                      />
+                    ))}
+                  </div>
+                )}
+
+              </section>
+
+              {/* Sidebar Column: JANGAN TERLEPAS & Categories */}
+              <DontMissSidebar
+                events={events}
+                selectedCategory={selectedCategory}
+                onSelectCategory={setSelectedCategory}
+                onViewDetails={setSelectedEventForDetail}
+                onSelectTab={setCurrentTab}
+              />
+
+            </div>
+          </div>
+        )}
+
+        {/* ALL EVENTS TAB */}
+        {currentTab === 'events' && (
+          <div className="space-y-6 animate-in fade-in duration-300">
+            <div className="bg-white/60 backdrop-blur-xl border border-white/80 rounded-3xl p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-2xl font-black text-slate-900">
+                  Semua Acara & Aktiviti KPMBP
+                </h2>
+                <p className="text-xs text-slate-500 mt-1">
+                  Cari, tapis mengikut kategori, dan simpan event pilihan anda.
+                </p>
+              </div>
+
+              {/* Category Pills & Saved Toggle */}
+              <div className="flex flex-wrap items-center gap-1.5 max-w-full">
+                <button
+                  onClick={() => setShowOnlySaved(!showOnlySaved)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                    showOnlySaved
+                      ? 'bg-amber-500 text-white shadow-xs'
+                      : 'bg-white/80 text-amber-700 border border-amber-200 hover:bg-amber-50'
+                  }`}
+                >
+                  <Bookmark className={`w-3.5 h-3.5 ${showOnlySaved ? 'fill-white' : 'fill-amber-500 text-amber-500'}`} />
+                  <span>Disimpan ({savedEventIds.length})</span>
+                </button>
+
+                {(['Semua', 'Pertandingan', 'Bengkel', 'Program Pelajar', 'Kelab & Persatuan', 'Akademik', 'Kebudayaan', 'Sukan', 'Kerjaya', 'Institusi'] as EventCategory[]).map((cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => setSelectedCategory(cat)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+                      selectedCategory === cat && !showOnlySaved
+                        ? 'bg-indigo-600 text-white shadow-xs'
+                        : 'bg-white/80 text-slate-600 border border-slate-200/80 hover:bg-white'
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+              {filteredEvents.map((event) => (
+                <EventCard
+                  key={event.id}
+                  event={event}
+                  onViewDetails={setSelectedEventForDetail}
+                  onRegister={setSelectedEventForRegistration}
+                  isSaved={savedEventIds.includes(event.id)}
+                  onToggleSave={handleToggleSave}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* CALENDAR TAB */}
+        {currentTab === 'calendar' && (
+          <div className="animate-in fade-in duration-300">
+            <CalendarView
+              events={events}
+              onViewDetails={setSelectedEventForDetail}
+            />
+          </div>
+        )}
+
+        {/* DONT MISS TAB */}
+        {currentTab === 'dont-miss' && (
+          <div className="space-y-6 animate-in fade-in duration-300">
+            <div className="bg-rose-500 text-white rounded-3xl p-6 shadow-md relative overflow-hidden">
+              <div className="flex items-center gap-2 text-rose-200 font-bold text-xs uppercase tracking-wider mb-1">
+                <Flame className="w-4 h-4 text-white" />
+                <span>Section Khas: Jangan Terlepas</span>
+              </div>
+              <h2 className="text-2xl sm:text-3xl font-black">
+                Program Yang Memerlukan Tindakan Segera
+              </h2>
+              <p className="text-xs text-rose-100 mt-1 max-w-xl">
+                Daftar sebelum tarikh tutup pendaftaran untuk memastikan anda tidak terlepas peluang menyertai acara, bengkel, dan pertandingan KPMBP.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+              {sortEventsByNearestDue(
+                events.filter((e) => e.status === 'Registration Closing Soon' || e.status === 'Registration Open')
+              ).map((event) => (
+                <EventCard
+                  key={event.id}
+                  event={event}
+                  onViewDetails={setSelectedEventForDetail}
+                  onRegister={setSelectedEventForRegistration}
+                  isSaved={savedEventIds.includes(event.id)}
+                  onToggleSave={handleToggleSave}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ADMIN TAB */}
+        {currentTab === 'admin' && (
+          <div className="animate-in fade-in duration-300">
+            {isAdminUnlocked ? (
+              <AdminPortal
+                events={events}
+                onCreateEvent={handleCreateEvent}
+                onUpdateEvent={handleUpdateEvent}
+                onDeleteEvent={handleDeleteEvent}
+              />
+            ) : (
+              <div className="max-w-md mx-auto my-12 bg-white/80 backdrop-blur-xl border border-slate-200/80 rounded-3xl p-8 text-center space-y-5 shadow-xl">
+                <div className="w-16 h-16 bg-gradient-to-br from-slate-900 to-indigo-900 rounded-2xl flex items-center justify-center text-amber-400 mx-auto shadow-lg shadow-indigo-100">
+                  <Lock className="w-8 h-8" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-black text-slate-900">Akses Mod Admin Dikunci</h3>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Sila masukkan 4-digit PIN keselamatan untuk membuat, mengubah, atau memadam acara.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setIsAdminPinOpen(true)}
+                  className="w-full py-3 px-5 bg-slate-900 hover:bg-black text-amber-300 font-extrabold text-xs rounded-2xl shadow-md transition-all flex items-center justify-center gap-2"
+                >
+                  <KeyRound className="w-4 h-4 text-amber-400" />
+                  <span>Masukkan PIN Keselamatan</span>
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+      </main>
+
+      {/* Detail Modal */}
+      <EventDetailModal
+        event={selectedEventForDetail}
+        onClose={() => setSelectedEventForDetail(null)}
+        onRegister={(evt) => {
+          setSelectedEventForDetail(null);
+          setSelectedEventForRegistration(evt);
+        }}
+      />
+
+      {/* Registration Modal */}
+      <RegistrationModal
+        event={selectedEventForRegistration}
+        onClose={() => setSelectedEventForRegistration(null)}
+        onSuccess={handleRegistrationSuccess}
+      />
+
+      {/* Security PIN Modal */}
+      <AdminPinModal
+        isOpen={isAdminPinOpen}
+        onClose={() => setIsAdminPinOpen(false)}
+        onSuccess={handleAdminPinSuccess}
+      />
+
+      {/* Footer */}
+      <footer className="mt-auto border-t border-white/40 bg-white/30 backdrop-blur-md py-6 z-10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-600 font-medium">
+          <div className="flex items-center gap-2">
+            <img 
+              src="https://raw.githubusercontent.com/syncrozz/syncrozz-assets/main/logo/Event%20KPMBP/android-chrome-192x192.png" 
+              alt="Event KPMBP Logo" 
+              className="w-5 h-5 object-contain rounded"
+            />
+            <span>
+              © 2026 KPMBP Event Kpmbp. By{' '}
+              <a 
+                href="https://wasap.my/60145313756" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="font-black text-indigo-600 hover:text-indigo-800 underline transition-colors"
+              >
+                Syncrozz
+              </a>
+            </span>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-6 text-slate-600 font-semibold">
+            <a 
+              href="https://wasap.my/60145313756" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="hover:text-indigo-600 transition-colors flex items-center gap-1"
+            >
+              Hubungi Syncrozz (WhatsApp)
+            </a>
+            <button 
+              onClick={() => {
+                if (!isAdminUnlocked) setIsAdminPinOpen(true);
+                else setCurrentTab('admin');
+              }}
+              className="hover:text-indigo-600 transition-colors flex items-center gap-1 font-bold"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-indigo-600" />
+              <span>{isAdminUnlocked ? 'Admin Active' : 'Admin Mode'}</span>
+            </button>
+          </div>
+        </div>
+      </footer>
+
+    </div>
+  );
+}

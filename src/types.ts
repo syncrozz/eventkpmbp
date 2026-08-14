@@ -1,0 +1,60 @@
+export type EventCategory =
+  | 'Semua'
+  | 'Pertandingan'
+  | 'Bengkel'
+  | 'Program Pelajar'
+  | 'Kelab & Persatuan'
+  | 'Akademik'
+  | 'Kebudayaan'
+  | 'Sukan'
+  | 'Kerjaya'
+  | 'Institusi'
+  | 'Lain-lain';
+
+export type EventStatus =
+  | 'Upcoming'
+  | 'Registration Open'
+  | 'Registration Closing Soon'
+  | 'Registration Closed'
+  | 'Fully Booked'
+  | 'Ongoing'
+  | 'Completed'
+  | 'Cancelled';
+
+export interface KpmbpEvent {
+  id: string;
+  title: string;
+  description: string;
+  category: Exclude<EventCategory, 'Semua'>;
+  date: string; // ISO YYYY-MM-DD
+  startTime: string;
+  endTime: string;
+  location: string;
+  organiser: string;
+  image?: string;
+  registrationUrl?: string;
+  registrationDeadline?: string; // ISO datetime YYYY-MM-DDTHH:mm
+  status: EventStatus;
+  eligibility: string;
+  contact: string;
+  featured?: boolean;
+  importantNotice?: string;
+  seatsLeft?: number;
+  totalSeats?: number;
+  tags?: string[];
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface RegistrationRecord {
+  id: string;
+  eventId: string;
+  studentName: string;
+  studentId: string;
+  email: string;
+  phone: string;
+  programCode: string;
+  timestamp: string;
+}
+
+export type ViewTab = 'discover' | 'events' | 'calendar' | 'dont-miss' | 'admin';
