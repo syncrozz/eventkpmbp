@@ -12,8 +12,9 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   events,
   onViewDetails
 }) => {
-  const [currentYear, setCurrentYear] = useState(2026);
-  const [currentMonth, setCurrentMonth] = useState(7); // 0-indexed: 7 = Ogos
+  const today = new Date();
+  const [currentYear, setCurrentYear] = useState(() => today.getFullYear());
+  const [currentMonth, setCurrentMonth] = useState(() => today.getMonth());
   const [selectedCategory, setSelectedCategory] = useState<EventCategory>('Semua');
   const [viewMode, setViewMode] = useState<'grid' | 'agenda'>('grid');
 
@@ -80,22 +81,39 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
         <div className="flex items-center gap-3">
           {/* Month Stepper */}
-          <div className="flex items-center bg-white border border-slate-200 rounded-xl px-2 py-1 shadow-2xs">
-            <button
-              onClick={handlePrevMonth}
-              className="p-1 text-slate-600 hover:text-indigo-600 hover:bg-slate-100 rounded-lg transition-colors"
-            >
-              <ChevronLeft className="w-5 h-5" />
-            </button>
-            <span className="text-sm font-bold text-slate-800 px-3 min-w-[130px] text-center">
-              {monthNamesMalay[currentMonth]} {currentYear}
-            </span>
-            <button
-              onClick={handleNextMonth}
-              className="p-1 text-slate-600 hover:text-indigo-600 hover:bg-slate-100 rounded-lg transition-colors"
-            >
-              <ChevronRight className="w-5 h-5" />
-            </button>
+          <div className="flex items-center gap-1.5">
+            <div className="flex items-center bg-white border border-slate-200 rounded-xl px-2 py-1 shadow-2xs">
+              <button
+                onClick={handlePrevMonth}
+                className="p-1 text-slate-600 hover:text-indigo-600 hover:bg-slate-100 rounded-lg transition-colors"
+                title="Bulan Sebelumnya"
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+              <span className="text-sm font-bold text-slate-800 px-3 min-w-[130px] text-center">
+                {monthNamesMalay[currentMonth]} {currentYear}
+              </span>
+              <button
+                onClick={handleNextMonth}
+                className="p-1 text-slate-600 hover:text-indigo-600 hover:bg-slate-100 rounded-lg transition-colors"
+                title="Bulan Seterusnya"
+              >
+                <ChevronRight className="w-5 h-5" />
+              </button>
+            </div>
+
+            {(currentMonth !== today.getMonth() || currentYear !== today.getFullYear()) && (
+              <button
+                onClick={() => {
+                  setCurrentMonth(today.getMonth());
+                  setCurrentYear(today.getFullYear());
+                }}
+                className="px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold rounded-xl transition-colors border border-indigo-200/60 shadow-2xs"
+                title="Kembali ke Bulan Semasa"
+              >
+                Hari Ini
+              </button>
+            )}
           </div>
 
           {/* Grid vs Agenda Toggle */}
@@ -165,7 +183,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
               {Array.from({ length: daysInMonth }).map((_, idx) => {
                 const dayNum = idx + 1;
                 const dayEvents = eventsByDay[dayNum] || [];
-                const isToday = dayNum === 11 && currentMonth === 7 && currentYear === 2026;
+                const isToday = dayNum === today.getDate() && currentMonth === today.getMonth() && currentYear === today.getFullYear();
 
                 return (
                   <div
