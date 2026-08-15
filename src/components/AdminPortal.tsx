@@ -54,6 +54,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const [registrationUrl, setRegistrationUrl] = useState('');
   const [registrationDeadline, setRegistrationDeadline] = useState('');
   const [status, setStatus] = useState<EventStatus>('Upcoming');
+  const [seatsLeft, setSeatsLeft] = useState<string>('');
+  const [totalSeats, setTotalSeats] = useState<string>('');
   const [eligibility, setEligibility] = useState('Terbuka kepada semua warga KPMBP');
   const [contact, setContact] = useState('Urusetia KPMBP - 012-3456789');
 
@@ -83,6 +85,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     setRegistrationUrl('');
     setRegistrationDeadline('');
     setStatus('Upcoming');
+    setSeatsLeft('');
+    setTotalSeats('');
     setEligibility('Terbuka kepada semua warga KPMBP');
     setContact('Urusetia KPMBP - 012-3456789');
   };
@@ -106,6 +110,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     setRegistrationUrl(evt.registrationUrl || '');
     setRegistrationDeadline(evt.registrationDeadline || '');
     setStatus(evt.status);
+    setSeatsLeft(evt.seatsLeft !== undefined ? evt.seatsLeft.toString() : '');
+    setTotalSeats(evt.totalSeats !== undefined ? evt.totalSeats.toString() : '');
     setEligibility(evt.eligibility);
     setContact(evt.contact);
   };
@@ -189,6 +195,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
         ? (registrationDeadline || (eventMode === 'online' ? submissionDeadline : undefined))
         : undefined,
       status,
+      seatsLeft: registrationMode !== 'none' && seatsLeft !== '' ? parseInt(seatsLeft, 10) : undefined,
+      totalSeats: registrationMode !== 'none' && totalSeats !== '' ? parseInt(totalSeats, 10) : undefined,
       eligibility,
       contact
     };
@@ -577,16 +585,32 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                     </p>
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">
-                      Tarikh & Masa Tutup Pendaftaran (Pilihan)
-                    </label>
-                    <input
-                      type="datetime-local"
-                      value={registrationDeadline}
-                      onChange={(e) => setRegistrationDeadline(e.target.value)}
-                      className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                    />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        Tarikh & Masa Tutup Pendaftaran (Pilihan)
+                      </label>
+                      <input
+                        type="datetime-local"
+                        value={registrationDeadline}
+                        onChange={(e) => setRegistrationDeadline(e.target.value)}
+                        className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        Slot Terhad / Tempat Kosong Tersisa (Pilihan)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={seatsLeft}
+                        onChange={(e) => setSeatsLeft(e.target.value)}
+                        placeholder="Contoh: 8 (Baki slot)"
+                        className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                      />
+                      <p className="text-[10px] text-slate-400 mt-0.5">Biarkan kosong jika tiada had slot.</p>
+                    </div>
                   </div>
                 </div>
               )}
@@ -610,16 +634,32 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                     </p>
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">
-                      Tarikh & Masa Tutup Pendaftaran (Pilihan)
-                    </label>
-                    <input
-                      type="datetime-local"
-                      value={registrationDeadline}
-                      onChange={(e) => setRegistrationDeadline(e.target.value)}
-                      className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                    />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        Tarikh & Masa Tutup Pendaftaran (Pilihan)
+                      </label>
+                      <input
+                        type="datetime-local"
+                        value={registrationDeadline}
+                        onChange={(e) => setRegistrationDeadline(e.target.value)}
+                        className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        Slot Terhad / Tempat Kosong Tersisa (Pilihan)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={seatsLeft}
+                        onChange={(e) => setSeatsLeft(e.target.value)}
+                        placeholder="Contoh: 2 (Baki slot)"
+                        className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                      />
+                      <p className="text-[10px] text-slate-400 mt-0.5">Biarkan kosong jika tiada had slot.</p>
+                    </div>
                   </div>
                 </div>
               )}

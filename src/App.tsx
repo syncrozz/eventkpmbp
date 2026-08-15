@@ -540,7 +540,7 @@ export default function App() {
               className="w-5 h-5 object-contain rounded"
             />
             <span>
-              © 2026 KPMBP Event Kpmbp. By{' '}
+              © 2026 EVENT KPMBP. By{' '}
               <a 
                 href="https://wasap.my/60145313756" 
                 target="_blank" 
