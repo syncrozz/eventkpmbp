@@ -81,14 +81,14 @@ export async function testConnection(): Promise<boolean> {
 testConnection();
 
 /**
- * Seeds initial event data into Firestore if collection is empty.
+ * Seeds initial event data into Firestore if collection is empty or when manually requested.
  */
-export async function seedEventsIfEmpty(): Promise<void> {
+export async function seedEventsIfEmpty(force = false): Promise<void> {
   try {
     const eventsRef = collection(db, EVENTS_COLLECTION);
     const snapshot = await getDocs(eventsRef);
     
-    if (snapshot.empty) {
+    if (snapshot.empty || force) {
       console.log('Seeding initial KPMBP events to Firestore...');
       const batch = writeBatch(db);
       
@@ -103,6 +103,9 @@ export async function seedEventsIfEmpty(): Promise<void> {
       }
       
       await batch.commit();
+      try {
+        localStorage.setItem('kpmbp_has_seeded', 'true');
+      } catch {}
       console.log('Seeding completed successfully into Firestore.');
     }
   } catch (error) {
@@ -123,10 +126,18 @@ export function subscribeToEvents(
     eventsRef,
     async (snapshot) => {
       if (snapshot.empty) {
-        // Trigger seed if empty, and fallback to initial events
-        await seedEventsIfEmpty();
-        onUpdate(INITIAL_EVENTS);
-        return;
+        // If the database has never been initialized on this browser, run initial seed
+        const alreadySeeded = typeof window !== 'undefined' && localStorage.getItem('kpmbp_has_seeded') === 'true';
+        if (!alreadySeeded) {
+          try { localStorage.setItem('kpmbp_has_seeded', 'true'); } catch {}
+          await seedEventsIfEmpty();
+          onUpdate(INITIAL_EVENTS);
+          return;
+        } else {
+          // If the admin deliberately deleted events down to 0, reflect empty state
+          onUpdate([]);
+          return;
+        }
       }
 
       const eventsList: KpmbpEvent[] = [];

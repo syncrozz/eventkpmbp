@@ -13,14 +13,20 @@ interface AdminPortalProps {
   events: KpmbpEvent[];
   onCreateEvent: (newEvent: Omit<KpmbpEvent, 'id'>) => void;
   onUpdateEvent: (updatedEvent: KpmbpEvent) => void;
-  onDeleteEvent: (id: string) => void;
+  onDeleteEvent: (event: KpmbpEvent) => void;
+  initialEditingEvent?: KpmbpEvent | null;
+  onClearInitialEditingEvent?: () => void;
+  onSeedSampleData?: () => void;
 }
 
 export const AdminPortal: React.FC<AdminPortalProps> = ({
   events,
   onCreateEvent,
   onUpdateEvent,
-  onDeleteEvent
+  onDeleteEvent,
+  initialEditingEvent,
+  onClearInitialEditingEvent,
+  onSeedSampleData
 }) => {
   const [activeAdminTab, setActiveAdminTab] = useState<'events' | 'registrations'>('events');
   const [registrations, setRegistrations] = useState<RegistrationRecord[]>([]);
@@ -29,6 +35,16 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
   const [editingEvent, setEditingEvent] = useState<KpmbpEvent | null>(null);
   const [isCreating, setIsCreating] = useState(false);
+
+  // Auto-load initialEditingEvent if requested from card/modal
+  useEffect(() => {
+    if (initialEditingEvent) {
+      handleStartEdit(initialEditingEvent);
+      if (onClearInitialEditingEvent) {
+        onClearInitialEditingEvent();
+      }
+    }
+  }, [initialEditingEvent]);
 
   // Subscribe to live student registrations from Firestore
   useEffect(() => {
@@ -239,7 +255,18 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
         </div>
 
         {!isCreating && !editingEvent && (
-          <div className="flex items-center gap-2 self-start md:self-auto">
+          <div className="flex flex-wrap items-center gap-2 self-start md:self-auto">
+            {onSeedSampleData && (
+              <button
+                type="button"
+                onClick={onSeedSampleData}
+                className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3.5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all border border-slate-200/80"
+                title="Muat semula set acara sampel default KPMBP ke Firestore"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>Muat Semula Sampel</span>
+              </button>
+            )}
             <button
               onClick={handleStartCreate}
               className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold shadow-lg shadow-indigo-200 flex items-center gap-2 transition-all"
@@ -972,7 +999,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                       <Edit2 className="w-3.5 h-3.5" />
                     </button>
                     <button
-                      onClick={() => onDeleteEvent(evt.id)}
+                      onClick={() => onDeleteEvent(evt)}
                       className="p-1.5 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors"
                       title="Padam"
                     >

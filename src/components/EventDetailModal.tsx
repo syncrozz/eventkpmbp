@@ -20,19 +20,27 @@ import {
   X, Calendar, Clock, MapPin, User, ShieldAlert, 
   Share2, ExternalLink, Award, PhoneCall, Check, 
   CalendarPlus, MessageCircle, Copy, Globe, Send,
-  FileText, Download, Image as ImageIcon, Loader2, AlertCircle
+  FileText, Download, Image as ImageIcon, Loader2, AlertCircle, Edit2, Trash2, Settings
 } from 'lucide-react';
 
 interface EventDetailModalProps {
   event: KpmbpEvent | null;
   onClose: () => void;
   onRegister: (event: KpmbpEvent) => void;
+  isAdmin?: boolean;
+  onEdit?: (event: KpmbpEvent) => void;
+  onDelete?: (event: KpmbpEvent) => void;
+  onQuickAdminEdit?: (event: KpmbpEvent) => void;
 }
 
 export const EventDetailModal: React.FC<EventDetailModalProps> = ({
   event,
   onClose,
-  onRegister
+  onRegister,
+  isAdmin = false,
+  onEdit,
+  onDelete,
+  onQuickAdminEdit
 }) => {
   const [copied, setCopied] = useState(false);
   const [isGeneratingOgi, setIsGeneratingOgi] = useState(false);
@@ -124,13 +132,35 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
 
           <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/40 to-transparent" />
 
-          {/* Close Button */}
-          <button 
-            onClick={onClose}
-            className="absolute top-4 right-4 bg-black/40 hover:bg-black/70 text-white p-2 rounded-full backdrop-blur-md transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          {/* Header Action Buttons */}
+          <div className="absolute top-4 right-4 flex items-center gap-2 z-20">
+            {/* Admin Quick Edit Button */}
+            <button 
+              onClick={() => {
+                if (onQuickAdminEdit) {
+                  onQuickAdminEdit(event);
+                } else if (onEdit) {
+                  onClose();
+                  onEdit(event);
+                }
+              }}
+              className="bg-black/40 hover:bg-black/75 text-white/90 hover:text-amber-300 p-2 rounded-full backdrop-blur-md transition-all hover:scale-105 border border-white/15 shadow-sm group"
+              title={isAdmin ? "Sunting Maklumat Acara (Mod Admin Aktif)" : "Akses Cepat Pentadbir (Masukkan PIN untuk Sunting)"}
+              aria-label="Akses Pentadbir & Sunting Acara"
+            >
+              <Settings className="w-5 h-5 transition-transform group-hover:rotate-90 duration-300" />
+            </button>
+
+            {/* Close Button */}
+            <button 
+              onClick={onClose}
+              className="bg-black/40 hover:bg-black/75 text-white p-2 rounded-full backdrop-blur-md transition-colors border border-white/10"
+              title="Tutup (Esc)"
+              aria-label="Tutup"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
 
           {/* Banner Badges */}
           <div className="absolute bottom-4 left-6 right-6 flex flex-wrap items-center justify-between gap-2">
@@ -391,13 +421,45 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
         </div>
 
         {/* Footer Actions */}
-        <div className="p-4 bg-slate-50 border-t border-slate-200/80 flex items-center justify-between gap-3 shrink-0">
-          <button
-            onClick={onClose}
-            className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
-          >
-            Tutup
-          </button>
+        <div className="p-4 bg-slate-50 border-t border-slate-200/80 flex flex-wrap items-center justify-between gap-2.5 shrink-0">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onClose}
+              className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
+            >
+              Tutup
+            </button>
+
+            {isAdmin && (
+              <>
+                {onEdit && (
+                  <button
+                    onClick={() => {
+                      onClose();
+                      onEdit(event);
+                    }}
+                    className="px-3 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold transition-colors flex items-center gap-1.5 shadow-2xs"
+                    title="Sunting Acara Ini"
+                  >
+                    <Edit2 className="w-3.5 h-3.5" />
+                    <span>Sunting</span>
+                  </button>
+                )}
+                {onDelete && (
+                  <button
+                    onClick={() => {
+                      onDelete(event);
+                    }}
+                    className="px-3 py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold transition-colors flex items-center gap-1.5 shadow-2xs"
+                    title="Padamkan Acara Ini"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Padam</span>
+                  </button>
+                )}
+              </>
+            )}
+          </div>
 
           {event.registrationMode === 'none' ? (
             <a

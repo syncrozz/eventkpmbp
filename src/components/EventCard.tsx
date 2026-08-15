@@ -1,7 +1,7 @@
 import React from 'react';
 import { KpmbpEvent } from '../types';
 import { formatDateMalay, formatDeadlineMalay, getTimeRemainingMalay, getCategoryBadgeClass, getDynamicEventStatus } from '../utils/calendar';
-import { Clock, MapPin, User, ArrowRight, Flame, AlertTriangle, Bookmark, Globe, ExternalLink } from 'lucide-react';
+import { Clock, MapPin, User, ArrowRight, Flame, AlertTriangle, Bookmark, Globe, ExternalLink, Edit2, Trash2 } from 'lucide-react';
 
 interface EventCardProps {
   event: KpmbpEvent;
@@ -9,6 +9,9 @@ interface EventCardProps {
   onRegister: (event: KpmbpEvent) => void;
   isSaved?: boolean;
   onToggleSave?: (eventId: string) => void;
+  isAdmin?: boolean;
+  onEdit?: (event: KpmbpEvent) => void;
+  onDelete?: (event: KpmbpEvent) => void;
 }
 
 export const EventCard: React.FC<EventCardProps> = ({
@@ -16,7 +19,10 @@ export const EventCard: React.FC<EventCardProps> = ({
   onViewDetails,
   onRegister,
   isSaved = false,
-  onToggleSave
+  onToggleSave,
+  isAdmin = false,
+  onEdit,
+  onDelete
 }) => {
   const { day, month } = formatDateMalay(event.date);
   const liveStatus = getDynamicEventStatus(event);
@@ -156,6 +162,36 @@ export const EventCard: React.FC<EventCardProps> = ({
           </div>
 
           <div className="flex items-center gap-1.5 shrink-0">
+            {/* Quick Admin Actions */}
+            {isAdmin && (
+              <div className="flex items-center gap-1 bg-slate-900/90 p-1 rounded-xl shadow-xs">
+                {onEdit && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onEdit(event);
+                    }}
+                    className="p-1 rounded-lg text-amber-400 hover:bg-white/20 transition-colors"
+                    title="Sunting Acara Ini (Mod Pentadbir)"
+                  >
+                    <Edit2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
+                {onDelete && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDelete(event);
+                    }}
+                    className="p-1 rounded-lg text-rose-400 hover:bg-white/20 transition-colors"
+                    title="Padamkan Acara Ini"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            )}
+
             {onToggleSave && (
               <button
                 onClick={(e) => {

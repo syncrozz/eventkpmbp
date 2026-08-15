@@ -10,13 +10,15 @@ import { CalendarView } from './components/CalendarView';
 import { RegistrationModal } from './components/RegistrationModal';
 import { AdminPortal } from './components/AdminPortal';
 import { AdminPinModal } from './components/AdminPinModal';
+import { DeleteConfirmationModal } from './components/DeleteConfirmationModal';
 import { sortEventsByNearestDue, getCategoryButtonClass, isEventArchived } from './utils/calendar';
 import { 
   subscribeToEvents, 
   createEventInFirestore, 
   updateEventInFirestore, 
   deleteEventInFirestore, 
-  saveRegistrationToFirestore 
+  saveRegistrationToFirestore,
+  seedEventsIfEmpty
 } from './services/firebase';
 import { Sparkles, Calendar as CalendarIcon, Filter, Flame, CheckCircle2, ShieldCheck, Bookmark, Lock, KeyRound, Archive, Cloud } from 'lucide-react';
 
@@ -64,6 +66,10 @@ export default function App() {
   // Modals
   const [selectedEventForDetail, setSelectedEventForDetail] = useState<KpmbpEvent | null>(null);
   const [selectedEventForRegistration, setSelectedEventForRegistration] = useState<KpmbpEvent | null>(null);
+  const [eventToDelete, setEventToDelete] = useState<KpmbpEvent | null>(null);
+  const [isDeletingEvent, setIsDeletingEvent] = useState(false);
+  const [editingEventInAdmin, setEditingEventInAdmin] = useState<KpmbpEvent | null>(null);
+  const [pendingAdminEditEvent, setPendingAdminEditEvent] = useState<KpmbpEvent | null>(null);
 
   // Toast Notification
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -72,7 +78,7 @@ export default function App() {
   useEffect(() => {
     const unsubscribe = subscribeToEvents(
       (firestoreEvents) => {
-        if (firestoreEvents && firestoreEvents.length > 0) {
+        if (Array.isArray(firestoreEvents)) {
           setEvents(firestoreEvents);
           setIsFirebaseConnected(true);
           try {
@@ -127,8 +133,25 @@ export default function App() {
   const handleAdminPinSuccess = () => {
     setIsAdminUnlocked(true);
     setIsAdminPinOpen(false);
-    setCurrentTab('admin');
-    showToast('Akses Admin Mode Berjaya Disahkan!');
+    if (pendingAdminEditEvent) {
+      const target = pendingAdminEditEvent;
+      setPendingAdminEditEvent(null);
+      handleTriggerEdit(target);
+    } else {
+      setCurrentTab('admin');
+      showToast('Akses Admin Mode Berjaya Disahkan!');
+    }
+  };
+
+  const handleQuickAdminEdit = (evt: KpmbpEvent) => {
+    if (isAdminUnlocked) {
+      handleTriggerEdit(evt);
+    } else {
+      setPendingAdminEditEvent(evt);
+      setSelectedEventForDetail(null);
+      setIsAdminPinOpen(true);
+      showToast(`Sila masukkan PIN Pentadbir untuk menyunting "${evt.title}"`);
+    }
   };
 
   const handleToggleOffAdmin = () => {
@@ -216,20 +239,60 @@ export default function App() {
     }
   };
 
-  const handleDeleteEvent = async (id: string) => {
-    if (window.confirm('Adakah anda pasti mahu memadam acara ini dari pangkalan data?')) {
-      try {
-        await deleteEventInFirestore(id);
-        showToast('Acara telah berjaya dipadam daripada Firebase Cloud.');
-      } catch (err: any) {
-        console.error('Error deleting event from Firestore:', err);
-        setEvents((prev) => {
-          const next = prev.filter((e) => e.id !== id);
-          try { localStorage.setItem('kpmbp_events_v1', JSON.stringify(next)); } catch {}
-          return next;
-        });
-        showToast('Acara dipadam daripada paparan peranti.');
+  const handleRequestDelete = (target: KpmbpEvent | string) => {
+    if (typeof target === 'string') {
+      const found = events.find((e) => e.id === target) || null;
+      setEventToDelete(found);
+    } else {
+      setEventToDelete(target);
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!eventToDelete) return;
+    setIsDeletingEvent(true);
+    try {
+      await deleteEventInFirestore(eventToDelete.id);
+      showToast(`Acara "${eventToDelete.title}" telah berjaya dipadam daripada Firebase Cloud.`);
+      setEvents((prev) => prev.filter((e) => e.id !== eventToDelete.id));
+      if (selectedEventForDetail?.id === eventToDelete.id) {
+        setSelectedEventForDetail(null);
       }
+      setEventToDelete(null);
+    } catch (err: any) {
+      console.error('Error deleting event from Firestore:', err);
+      setEvents((prev) => {
+        const next = prev.filter((e) => e.id !== eventToDelete.id);
+        try { localStorage.setItem('kpmbp_events_v1', JSON.stringify(next)); } catch {}
+        return next;
+      });
+      showToast(`Acara dipadam daripada paparan peranti.`);
+      if (selectedEventForDetail?.id === eventToDelete.id) {
+        setSelectedEventForDetail(null);
+      }
+      setEventToDelete(null);
+    } finally {
+      setIsDeletingEvent(false);
+    }
+  };
+
+  const handleTriggerEdit = (evt: KpmbpEvent) => {
+    setEditingEventInAdmin(evt);
+    if (selectedEventForDetail?.id === evt.id) {
+      setSelectedEventForDetail(null);
+    }
+    setCurrentTab('admin');
+    showToast(`Membuka borang suntingan untuk "${evt.title}"`);
+  };
+
+  const handleSeedSampleData = async () => {
+    try {
+      showToast('Memuat semula set acara contoh rasmi KPMBP ke Firestore...');
+      await seedEventsIfEmpty(true);
+      showToast('Data contoh KPMBP berjaya dimuatkan semula ke Firebase Cloud!');
+    } catch (err) {
+      console.error('Error seeding data:', err);
+      showToast('Gagal memuat semula data contoh.');
     }
   };
 
@@ -422,6 +485,9 @@ export default function App() {
                   onRegister={setSelectedEventForRegistration}
                   isSaved={savedEventIds.includes(event.id)}
                   onToggleSave={handleToggleSave}
+                  isAdmin={isAdminUnlocked}
+                  onEdit={handleTriggerEdit}
+                  onDelete={handleRequestDelete}
                 />
               ))}
             </div>
@@ -465,6 +531,9 @@ export default function App() {
                   onRegister={setSelectedEventForRegistration}
                   isSaved={savedEventIds.includes(event.id)}
                   onToggleSave={handleToggleSave}
+                  isAdmin={isAdminUnlocked}
+                  onEdit={handleTriggerEdit}
+                  onDelete={handleRequestDelete}
                 />
               ))}
             </div>
@@ -479,7 +548,10 @@ export default function App() {
                 events={events}
                 onCreateEvent={handleCreateEvent}
                 onUpdateEvent={handleUpdateEvent}
-                onDeleteEvent={handleDeleteEvent}
+                onDeleteEvent={handleRequestDelete}
+                initialEditingEvent={editingEventInAdmin}
+                onClearInitialEditingEvent={() => setEditingEventInAdmin(null)}
+                onSeedSampleData={handleSeedSampleData}
               />
             ) : (
               <div className="max-w-md mx-auto my-12 bg-white/80 backdrop-blur-xl border border-slate-200/80 rounded-3xl p-8 text-center space-y-5 shadow-xl">
@@ -514,6 +586,10 @@ export default function App() {
           setSelectedEventForDetail(null);
           setSelectedEventForRegistration(evt);
         }}
+        isAdmin={isAdminUnlocked}
+        onEdit={handleTriggerEdit}
+        onDelete={handleRequestDelete}
+        onQuickAdminEdit={handleQuickAdminEdit}
       />
 
       {/* Registration Modal */}
@@ -526,8 +602,20 @@ export default function App() {
       {/* Security PIN Modal */}
       <AdminPinModal
         isOpen={isAdminPinOpen}
-        onClose={() => setIsAdminPinOpen(false)}
+        onClose={() => {
+          setIsAdminPinOpen(false);
+          setPendingAdminEditEvent(null);
+        }}
         onSuccess={handleAdminPinSuccess}
+      />
+
+      {/* Custom Delete Confirmation Modal */}
+      <DeleteConfirmationModal
+        isOpen={!!eventToDelete}
+        event={eventToDelete}
+        onClose={() => setEventToDelete(null)}
+        onConfirm={handleConfirmDelete}
+        isDeleting={isDeletingEvent}
       />
 
       {/* Footer */}
