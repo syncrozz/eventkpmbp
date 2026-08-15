@@ -941,7 +941,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                       </span>
                     ) : (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded text-[10px] font-bold">
-                        <span>Google Form</span>
+                        <span>Borang Daftar</span>
                       </span>
                     )}
                   </td>

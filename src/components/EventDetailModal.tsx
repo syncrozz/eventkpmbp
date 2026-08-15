@@ -1,10 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { KpmbpEvent } from '../types';
-import { formatDateMalay, formatDeadlineMalay, formatDateDMY, getGoogleCalendarUrl, downloadIcsFile, getTimeRemainingMalay, getCategoryBadgeClass, getDynamicEventStatus } from '../utils/calendar';
+import { 
+  formatDateMalay, 
+  formatDeadlineMalay, 
+  formatDateDMY, 
+  getGoogleCalendarUrl, 
+  downloadIcsFile, 
+  getTimeRemainingMalay, 
+  getCategoryBadgeClass, 
+  getDynamicEventStatus,
+  getEventShareText
+} from '../utils/calendar';
 import { 
   X, Calendar, Clock, MapPin, User, ShieldAlert, 
   Share2, ExternalLink, Award, PhoneCall, Check, 
-  CalendarPlus, MessageCircle, Copy, Globe, Send
+  CalendarPlus, MessageCircle, Copy, Globe, Send,
+  FileText
 } from 'lucide-react';
 
 interface EventDetailModalProps {
@@ -41,29 +52,20 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
   const isOnline = event.eventMode === 'online';
   const deadlineRemaining = getTimeRemainingMalay(isOnline ? event.submissionDeadline || event.registrationDeadline : event.registrationDeadline);
 
-  const handleCopyLink = () => {
-    const url = window.location.href.split('#')[0];
-    navigator.clipboard.writeText(`${url}#event-${event.id}`);
+  const handleCopyInfo = () => {
+    const fullText = getEventShareText(event);
+    navigator.clipboard.writeText(fullText);
     setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    setTimeout(() => setCopied(false), 2500);
   };
 
   const handleShareWhatsApp = () => {
-    const text = encodeURIComponent(
-      `🎭 *${event.title}*\n\n` +
-      `📅 *Tarikh:* ${fullDateMalay}\n` +
-      (isOnline ? `🌐 *Mod:* Online (Penyerahan: ${formatDeadlineMalay(event.submissionDeadline)})\n` : `🕒 *Masa:* ${event.startTime} - ${event.endTime || ''}\n📍 *Lokasi:* ${event.location || 'KPMBP'}\n`) +
-      `👤 *Anjuran:* ${event.organiser}\n\n` +
-      `Sertai dan ketahui maklumat lanjut di KPMBP Event Hub:\n` +
-      `${window.location.href.split('#')[0]}#event-${event.id}`
-    );
+    const text = encodeURIComponent(getEventShareText(event));
     window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
   };
 
   const handleShareTelegram = () => {
-    const text = encodeURIComponent(
-      `🎭 ${event.title}\n📅 ${fullDateMalay}\n📍 ${isOnline ? 'Online / Atas Talian' : event.location || 'KPMBP'}`
-    );
+    const text = encodeURIComponent(getEventShareText(event));
     const url = encodeURIComponent(window.location.href.split('#')[0]);
     window.open(`https://t.me/share/url?url=${url}&text=${text}`, '_blank');
   };
@@ -322,11 +324,16 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
               </button>
 
               <button
-                onClick={handleCopyLink}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold hover:bg-slate-200 transition-colors"
+                onClick={handleCopyInfo}
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all active:scale-95 shadow-2xs ${
+                  copied 
+                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' 
+                    : 'bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200/80'
+                }`}
+                title="Salin maklumat lengkap acara yang sedia ditampal ke WhatsApp atau Notes"
               >
-                {copied ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
-                <span>{copied ? 'Link Disalin!' : 'Salin Pautan'}</span>
+                {copied ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4 text-slate-600" />}
+                <span>{copied ? 'Maklumat Disalin!' : 'Salin Maklumat'}</span>
               </button>
             </div>
           </div>

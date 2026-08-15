@@ -199,6 +199,71 @@ export function buildRegistrationWhatsAppUrl(params: {
   return `https://wa.me/${number}?text=${encodeURIComponent(text)}`;
 }
 
+export function getEventShareText(event: KpmbpEvent): string {
+  const { full: fullDateMalay } = formatDateMalay(event.date);
+  const isOnline = event.eventMode === 'online';
+  const url = typeof window !== 'undefined' ? `${window.location.href.split('#')[0]}#event-${event.id}` : '';
+
+  let text = `📢 *INFO ACARA KPMBP*\n`;
+  text += `━━━━━━━━━━━━━━━━━━━━━\n`;
+  text += `📌 *${event.title}*\n`;
+  text += `🏷️ *Kategori:* ${event.category}\n`;
+  text += `📅 *Tarikh:* ${fullDateMalay}\n`;
+
+  if (isOnline) {
+    text += `🌐 *Mod:* Atas Talian (Online)\n`;
+    if (event.submissionDeadline) {
+      text += `⏳ *Tarikh Akhir Penyerahan:* ${formatDeadlineMalay(event.submissionDeadline)}\n`;
+    }
+  } else {
+    text += `🕒 *Masa:* ${event.startTime}${event.endTime ? ` - ${event.endTime}` : ''}\n`;
+    text += `📍 *Lokasi:* ${event.location || 'KPM Beranang (KPMBP)'}\n`;
+  }
+
+  text += `👤 *Anjuran:* ${event.organiser}\n`;
+  if (event.eligibility) {
+    text += `👥 *Kelayakan:* ${event.eligibility}\n`;
+  }
+  text += `🎖️ *Merit:* Disediakan (MARA Merit)\n`;
+
+  if (event.registrationMode === 'none') {
+    text += `🎟️ *Pendaftaran:* Terbuka / Masuk Percuma (Walk-in)\n`;
+  } else if (event.registrationMode === 'google_form' && event.registrationUrl) {
+    text += `📝 *Borang Daftar:* ${event.registrationUrl}\n`;
+    if (event.registrationDeadline) {
+      text += `⏰ *Tarikh Tutup:* ${formatDeadlineMalay(event.registrationDeadline)}\n`;
+    }
+  } else if (event.registrationMode === 'admin') {
+    text += `📝 *Pendaftaran:* Melalui Urusetia KPMBP\n`;
+    if (event.organiserWhatsApp) {
+      text += `📱 *WhatsApp Urusetia:* https://wa.me/${event.organiserWhatsApp.replace(/\D/g, '')}\n`;
+    }
+    if (event.registrationDeadline) {
+      text += `⏰ *Tarikh Tutup:* ${formatDeadlineMalay(event.registrationDeadline)}\n`;
+    }
+  }
+
+  if (event.seatsLeft !== undefined && event.registrationMode !== 'none') {
+    text += `⚡ *Baki Slot:* ${event.seatsLeft} tempat sahaja lagi\n`;
+  }
+
+  if (event.description) {
+    text += `\n📄 *Keterangan Ringkas:*\n${event.description}\n`;
+  }
+
+  if (event.contact) {
+    text += `\n📞 *Hubungi:* ${event.contact}\n`;
+  }
+
+  if (url) {
+    text += `\n🔗 *Maklumat Penuh & Kalendar:* ${url}\n`;
+  }
+  text += `━━━━━━━━━━━━━━━━━━━━━\n`;
+  text += `_Portal Rasmi Acara KPMBP - © 2026 EVENT KPMBP_`;
+
+  return text;
+}
+
 export function formatDateDMY(dateStr?: string): string {
   if (!dateStr) return '';
   try {
