@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { KpmbpEvent, RegistrationRecord } from '../types';
-import { formatDateMalay } from '../utils/calendar';
-import { X, CheckCircle, Ticket, User, Mail, Phone, ExternalLink, QrCode, Download } from 'lucide-react';
+import { formatDateMalay, buildRegistrationWhatsAppUrl } from '../utils/calendar';
+import { X, CheckCircle, Ticket, User, Mail, Phone, ExternalLink, QrCode, Download, MessageCircle, Send } from 'lucide-react';
 
 interface RegistrationModalProps {
   event: KpmbpEvent | null;
@@ -51,12 +51,23 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
       email,
       phone,
       programCode,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toLocaleString('ms-MY', { dateStyle: 'medium', timeStyle: 'short' })
     };
 
     setSubmittedPass(newRecord);
     onSuccess(newRecord);
   };
+
+  const whatsAppSubmissionUrl = submittedPass ? buildRegistrationWhatsAppUrl({
+    organiserWhatsApp: event.organiserWhatsApp || event.contact,
+    eventTitle: event.title,
+    studentName: submittedPass.studentName,
+    studentId: submittedPass.studentId,
+    programCode: submittedPass.programCode,
+    email: submittedPass.email,
+    phone: submittedPass.phone,
+    timestamp: submittedPass.timestamp
+  }) : '';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-200 overflow-y-auto">
@@ -73,15 +84,24 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
             <X className="w-5 h-5 text-white" />
           </button>
 
-          <span className="inline-block px-2.5 py-0.5 bg-white/20 rounded text-[10px] font-bold uppercase tracking-wider mb-2">
-            Pendaftaran Event KPMBP
-          </span>
+          <div className="flex items-center gap-2 mb-2">
+            <span className="inline-block px-2.5 py-0.5 bg-white/20 rounded text-[10px] font-bold uppercase tracking-wider">
+              {event.eventMode === 'online' ? '🌐 Pendaftaran Acara Online' : '🏛️ Pendaftaran Acara Fizikal'}
+            </span>
+            <span className="inline-block px-2 py-0.5 bg-emerald-500/80 rounded text-[10px] font-bold uppercase">
+              Urusetia WhatsApp
+            </span>
+          </div>
 
           <h3 className="text-xl font-extrabold leading-snug">
             {event.title}
           </h3>
           <p className="text-xs text-indigo-100 mt-1">
-            📅 {fullDateMalay} • 📍 {event.location}
+            {event.eventMode === 'online' ? (
+              <span>📅 {fullDateMalay} • ⏰ Due: {event.submissionDeadline ? event.submissionDeadline.replace('T', ' ') : '23:59'}</span>
+            ) : (
+              <span>📅 {fullDateMalay} • 📍 {event.location || 'Kampus KPMBP'}</span>
+            )}
           </p>
         </div>
 
@@ -89,18 +109,30 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
         <div className="p-6 space-y-4">
           
           {submittedPass ? (
-            /* Registration Pass Confirmation View */
+            /* Registration Pass Confirmation View with WhatsApp Direct Action */
             <div className="space-y-4 text-center animate-in zoom-in-95">
               <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 mx-auto flex items-center justify-center">
                 <CheckCircle className="w-7 h-7" />
               </div>
 
               <div>
-                <h4 className="text-lg font-black text-slate-900">Pendaftaran Berjaya!</h4>
+                <h4 className="text-lg font-black text-slate-900">Pendaftaran Berjaya Disimpan!</h4>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Slip pendaftaran digital anda telah dijana.
+                  Sila hantar ringkasan pendaftaran ini terus ke WhatsApp penganjur untuk pengesahan rekod.
                 </p>
               </div>
+
+              {/* Primary Action: Send to WhatsApp */}
+              <a
+                href={whatsAppSubmissionUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3 px-4 rounded-2xl text-xs font-black shadow-lg shadow-emerald-200 flex items-center justify-center gap-2 transition-all group"
+              >
+                <MessageCircle className="w-4 h-4 text-emerald-200 group-hover:scale-110 transition-transform" />
+                <span>Hantar Maklumat Pendaftaran ke WhatsApp Penganjur</span>
+                <Send className="w-3.5 h-3.5" />
+              </a>
 
               {/* Digital Pass Ticket */}
               <div className="bg-slate-50 border-2 border-dashed border-indigo-200 rounded-2xl p-5 text-left relative overflow-hidden shadow-2xs">
@@ -138,9 +170,10 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
                 <div className="mt-4 pt-3 border-t border-slate-200/80 flex items-center justify-between">
                   <div className="flex items-center gap-2 text-slate-400 text-[10px]">
                     <QrCode className="w-8 h-8 text-slate-800" />
-                    <span>Imbas QR semasa pendaftaran masuk</span>
+                    <span>Imbas QR semasa pengesahan</span>
                   </div>
                   <button 
+                    type="button"
                     onClick={() => window.print()}
                     className="flex items-center gap-1 text-xs font-bold text-indigo-600 hover:text-indigo-800"
                   >
@@ -151,30 +184,16 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
               </div>
 
               <button
+                type="button"
                 onClick={onClose}
-                className="w-full bg-slate-900 text-white py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider"
+                className="w-full bg-slate-900 hover:bg-slate-800 text-white py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors"
               >
-                Selesai
+                Selesai & Tutup
               </button>
             </div>
           ) : (
             /* Registration Form */
             <form onSubmit={handleSubmit} className="space-y-3">
-              
-              {event.registrationUrl && (
-                <div className="bg-indigo-50 border border-indigo-100 p-3 rounded-xl text-xs text-indigo-900 flex items-center justify-between mb-2">
-                  <span>Acara ini mempunyai pautan Google Form rasmi:</span>
-                  <a 
-                    href={event.registrationUrl} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="font-bold text-indigo-700 underline flex items-center gap-1 shrink-0"
-                  >
-                    Buka Google Form <ExternalLink className="w-3 h-3" />
-                  </a>
-                </div>
-              )}
-
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
                   Nama Penuh Peserta *
@@ -244,11 +263,12 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
-                  No. Telefon WhatsApp
+                  No. Telefon WhatsApp *
                 </label>
                 <div className="relative">
                   <input
                     type="tel"
+                    required
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     placeholder="0123456789"
@@ -261,9 +281,10 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
               <div className="pt-3">
                 <button
                   type="submit"
-                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl text-xs font-bold shadow-lg shadow-indigo-200 transition-all"
+                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl text-xs font-bold shadow-lg shadow-indigo-200 transition-all flex items-center justify-center gap-2"
                 >
-                  Sahkan & Jana Pas Pendaftaran
+                  <span>Sahkan & Dapatkan Pautan WhatsApp</span>
+                  <MessageCircle className="w-4 h-4" />
                 </button>
               </div>
             </form>
@@ -274,3 +295,4 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
     </div>
   );
 };
+

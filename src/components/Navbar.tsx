@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ViewTab } from '../types';
-import { Search, Calendar as CalendarIcon, Sparkles, Compass, Flame, ShieldCheck, Menu, X, Lock, KeyRound } from 'lucide-react';
+import { Search, Calendar as CalendarIcon, Sparkles, Compass, Flame, ShieldCheck, Menu, X, Lock, KeyRound, Archive } from 'lucide-react';
 
 interface NavbarProps {
   currentTab: ViewTab;
@@ -35,6 +35,7 @@ export const Navbar: React.FC<NavbarProps> = ({
       icon: <Flame className="w-4 h-4 text-rose-500" />,
       badge: urgentCount 
     },
+    { id: 'archive', label: 'Arkib', icon: <Archive className="w-4 h-4" /> },
   ];
 
   const handleAdminModeClick = () => {

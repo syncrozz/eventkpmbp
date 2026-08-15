@@ -1,6 +1,6 @@
 import React from 'react';
 import { KpmbpEvent, EventCategory, ViewTab } from '../types';
-import { getTimeRemainingMalay, formatDateMalay, sortEventsByNearestDue } from '../utils/calendar';
+import { getTimeRemainingMalay, formatDateMalay, sortEventsByNearestDue, getCategoryButtonClass, getCategoryBadgeClass, getDynamicEventStatus, isEventArchived } from '../utils/calendar';
 import { Flame, Calendar, ArrowRight, Filter, AlertOctagon, Clock } from 'lucide-react';
 
 interface DontMissSidebarProps {
@@ -18,16 +18,20 @@ export const DontMissSidebar: React.FC<DontMissSidebarProps> = ({
   onViewDetails,
   onSelectTab
 }) => {
-  // Urgent events sorted by deadline urgency
+  // Urgent events sorted by deadline urgency (excluding archived events)
   const urgentEvents = sortEventsByNearestDue(
-    events.filter(
-      (e) => e.status === 'Registration Closing Soon' || (e.seatsLeft !== undefined && e.seatsLeft <= 5) || e.status === 'Registration Open'
-    )
+    events
+      .filter((e) => !isEventArchived(e))
+      .filter((e) => {
+        const status = getDynamicEventStatus(e);
+        return status === 'Registration Closing Soon' || (e.seatsLeft !== undefined && e.seatsLeft <= 5) || status === 'Registration Open';
+      })
   ).slice(0, 4);
 
   const getUrgencyLevel = (evt: KpmbpEvent) => {
-    if (!evt.registrationDeadline) return { label: 'SEGERA', color: 'bg-amber-100 text-amber-800 border-amber-200' };
-    const diffHours = (new Date(evt.registrationDeadline).getTime() - Date.now()) / (1000 * 60 * 60);
+    const deadline = evt.eventMode === 'online' ? evt.submissionDeadline || evt.registrationDeadline : evt.registrationDeadline;
+    if (!deadline) return { label: 'SEGERA', color: 'bg-amber-100 text-amber-800 border-amber-200' };
+    const diffHours = (new Date(deadline).getTime() - Date.now()) / (1000 * 60 * 60);
     if (diffHours < 24 && diffHours > 0) {
       return { label: 'KRITIKAL (<24j)', color: 'bg-rose-100 text-rose-800 border-rose-300 animate-pulse' };
     } else if (diffHours <= 72) {
@@ -137,11 +141,10 @@ export const DontMissSidebar: React.FC<DontMissSidebarProps> = ({
               <button
                 key={cat}
                 onClick={() => onSelectCategory(cat)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                className={`px-3 py-1.5 rounded-xl text-xs whitespace-nowrap transition-all ${getCategoryButtonClass(
+                  cat,
                   isSelected
-                    ? 'bg-indigo-600 text-white shadow-xs'
-                    : 'bg-white/80 text-slate-600 border border-slate-200/80 hover:bg-white hover:text-indigo-600 hover:border-indigo-200'
-                }`}
+                )}`}
               >
                 {cat}
               </button>

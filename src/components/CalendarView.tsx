@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { KpmbpEvent, EventCategory } from '../types';
-import { formatDateMalay } from '../utils/calendar';
+import { formatDateMalay, getCategoryButtonClass, getCalendarEventPillClass, getCategoryBadgeClass } from '../utils/calendar';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, MapPin, Grid, List } from 'lucide-react';
 
 interface CalendarViewProps {
@@ -146,11 +146,10 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           <button
             key={cat}
             onClick={() => setSelectedCategory(cat)}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+            className={`px-3 py-1.5 rounded-xl text-xs whitespace-nowrap transition-all ${getCategoryButtonClass(
+              cat,
               selectedCategory === cat
-                ? 'bg-indigo-600 text-white shadow-xs'
-                : 'bg-white border border-slate-200 text-slate-600 hover:border-indigo-300'
-            }`}
+            )}`}
           >
             {cat}
           </button>
@@ -190,20 +189,20 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                     key={`day-${dayNum}`}
                     className={`h-28 rounded-2xl p-2 border flex flex-col justify-between transition-all ${
                       isToday
-                        ? 'bg-indigo-50/80 border-indigo-300 shadow-2xs'
+                        ? 'bg-indigo-50/80 border-indigo-300 shadow-2xs ring-2 ring-indigo-200/60'
                         : 'bg-white/80 border-slate-200/80 hover:border-indigo-200'
                     }`}
                   >
                     <div className="flex items-center justify-between">
                       <span
                         className={`text-xs font-extrabold w-6 h-6 rounded-full flex items-center justify-center ${
-                          isToday ? 'bg-indigo-600 text-white' : 'text-slate-700'
+                          isToday ? 'bg-indigo-600 text-white shadow-2xs' : 'text-slate-700'
                         }`}
                       >
                         {dayNum}
                       </span>
                       {dayEvents.length > 0 && (
-                        <span className="text-[10px] font-black bg-indigo-100 text-indigo-700 px-1.5 py-0.2 rounded-full">
+                        <span className="text-[10px] font-black bg-slate-100 text-slate-700 px-1.5 py-0.2 rounded-full border border-slate-200">
                           {dayEvents.length}
                         </span>
                       )}
@@ -215,8 +214,10 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                         <div
                           key={evt.id}
                           onClick={() => onViewDetails(evt)}
-                          className="px-1.5 py-1 rounded-lg bg-indigo-600/90 hover:bg-indigo-700 text-white text-[10px] font-semibold truncate cursor-pointer shadow-2xs transition-colors"
-                          title={evt.title}
+                          className={`px-1.5 py-1 rounded-lg text-[10px] font-bold truncate cursor-pointer shadow-2xs transition-all active:scale-95 ${getCalendarEventPillClass(
+                            evt.category
+                          )}`}
+                          title={`${evt.title} (${evt.category})`}
                         >
                           {evt.title}
                         </div>
@@ -253,7 +254,9 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                     </div>
 
                     <div>
-                      <span className="text-[10px] font-bold px-2 py-0.5 bg-slate-100 text-slate-700 rounded-md uppercase">
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase border ${getCategoryBadgeClass(
+                        evt.category
+                      )}`}>
                         {evt.category}
                       </span>
                       <h4 className="text-sm font-bold text-slate-900 mt-1 hover:text-indigo-600">

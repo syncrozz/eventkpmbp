@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { KpmbpEvent } from '../types';
-import { formatDateMalay, getGoogleCalendarUrl, downloadIcsFile, getTimeRemainingMalay } from '../utils/calendar';
+import { formatDateMalay, getGoogleCalendarUrl, downloadIcsFile, getTimeRemainingMalay, getCategoryBadgeClass, getDynamicEventStatus } from '../utils/calendar';
 import { 
   X, Calendar, Clock, MapPin, User, ShieldAlert, 
   Share2, ExternalLink, Award, PhoneCall, Check, 
-  CalendarPlus, MessageCircle, Copy 
+  CalendarPlus, MessageCircle, Copy, Globe, Send
 } from 'lucide-react';
 
 interface EventDetailModalProps {
@@ -37,10 +37,12 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
   if (!event) return null;
 
   const { full: fullDateMalay } = formatDateMalay(event.date);
-  const deadlineRemaining = getTimeRemainingMalay(event.registrationDeadline);
+  const liveStatus = getDynamicEventStatus(event);
+  const isOnline = event.eventMode === 'online';
+  const deadlineRemaining = getTimeRemainingMalay(isOnline ? event.submissionDeadline || event.registrationDeadline : event.registrationDeadline);
 
   const handleCopyLink = () => {
-    const url = window.location.href;
+    const url = window.location.href.split('#')[0];
     navigator.clipboard.writeText(`${url}#event-${event.id}`);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -50,25 +52,24 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
     const text = encodeURIComponent(
       `🎭 *${event.title}*\n\n` +
       `📅 *Tarikh:* ${fullDateMalay}\n` +
-      `🕒 *Masa:* ${event.startTime}\n` +
-      `📍 *Lokasi:* ${event.location}\n` +
+      (isOnline ? `🌐 *Mod:* Online (Penyerahan: ${event.submissionDeadline ? event.submissionDeadline.replace('T', ' ') : 'Sebelum 11:59 PM'})\n` : `🕒 *Masa:* ${event.startTime} - ${event.endTime || ''}\n📍 *Lokasi:* ${event.location || 'KPMBP'}\n`) +
       `👤 *Anjuran:* ${event.organiser}\n\n` +
       `Sertai dan ketahui maklumat lanjut di KPMBP Event Hub:\n` +
-      `https://eventkpmbp.syncrozz.com`
+      `${window.location.href.split('#')[0]}#event-${event.id}`
     );
     window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
   };
 
   const handleShareTelegram = () => {
     const text = encodeURIComponent(
-      `🎭 ${event.title}\n📅 ${fullDateMalay} (${event.startTime})\n📍 ${event.location}`
+      `🎭 ${event.title}\n📅 ${fullDateMalay}\n📍 ${isOnline ? 'Online / Atas Talian' : event.location || 'KPMBP'}`
     );
-    const url = encodeURIComponent('https://eventkpmbp.syncrozz.com');
+    const url = encodeURIComponent(window.location.href.split('#')[0]);
     window.open(`https://t.me/share/url?url=${url}&text=${text}`, '_blank');
   };
 
   const isRegistrationAvailable =
-    event.status === 'Registration Open' || event.status === 'Registration Closing Soon';
+    liveStatus === 'Registration Open' || liveStatus === 'Registration Closing Soon';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-200 overflow-y-auto">
@@ -101,11 +102,20 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
 
           {/* Banner Badges */}
           <div className="absolute bottom-4 left-6 right-6 flex flex-wrap items-center justify-between gap-2">
-            <span className="px-3 py-1 text-xs font-black rounded-lg bg-indigo-600 text-white uppercase tracking-wider shadow-md">
-              {event.category}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className={`px-3 py-1 text-xs font-black rounded-lg uppercase tracking-wider shadow-md border ${getCategoryBadgeClass(
+                event.category
+              )}`}>
+                {event.category}
+              </span>
+              <span className={`px-2.5 py-1 text-xs font-bold rounded-lg ${
+                isOnline ? 'bg-amber-400 text-amber-950' : 'bg-slate-700 text-white'
+              }`}>
+                {isOnline ? '🌐 ONLINE' : '🏛️ FIZIKAL'}
+              </span>
+            </div>
             <span className="px-3 py-1 text-xs font-bold rounded-lg bg-white/90 text-slate-800 backdrop-blur-md">
-              {event.status}
+              {liveStatus}
             </span>
           </div>
         </div>
@@ -135,23 +145,41 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0">
-                <Clock className="w-4 h-4" />
+            {isOnline ? (
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
+                  <Clock className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="text-[10px] text-amber-700 font-bold uppercase">Due Submission</div>
+                  <div className="font-bold text-amber-900">
+                    {event.submissionDeadline ? event.submissionDeadline.replace('T', ' ') : 'Sebelum 11:59 PM'}
+                  </div>
+                </div>
               </div>
-              <div>
-                <div className="text-[10px] text-slate-400 font-bold uppercase">Masa</div>
-                <div className="font-bold text-slate-800">{event.startTime} {event.endTime ? `– ${event.endTime}` : ''}</div>
+            ) : (
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0">
+                  <Clock className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="text-[10px] text-slate-400 font-bold uppercase">Masa Program</div>
+                  <div className="font-bold text-slate-800">{event.startTime} {event.endTime ? `– ${event.endTime}` : ''}</div>
+                </div>
               </div>
-            </div>
+            )}
 
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0">
-                <MapPin className="w-4 h-4" />
+              <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
+                isOnline ? 'bg-amber-100 text-amber-700' : 'bg-indigo-100 text-indigo-700'
+              }`}>
+                {isOnline ? <Globe className="w-4 h-4" /> : <MapPin className="w-4 h-4" />}
               </div>
               <div>
-                <div className="text-[10px] text-slate-400 font-bold uppercase">Lokasi</div>
-                <div className="font-bold text-slate-800">{event.location}</div>
+                <div className="text-[10px] text-slate-400 font-bold uppercase">Mod & Lokasi</div>
+                <div className="font-bold text-slate-800">
+                  {isOnline ? 'Atas Talian (Online Platform)' : (event.location || 'Kampus KPMBP')}
+                </div>
               </div>
             </div>
 
@@ -172,12 +200,12 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
               <ShieldAlert className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
               <div>
                 <div className="font-extrabold text-rose-700 uppercase tracking-wide text-[10px]">
-                  Peringatan Pendaftaran
+                  Peringatan Pendaftaran / Penyerahan
                 </div>
                 <div className="font-bold text-sm mt-0.5">{deadlineRemaining}</div>
-                {event.registrationDeadline && (
+                {(event.submissionDeadline || event.registrationDeadline) && (
                   <div className="text-slate-500 text-[11px] mt-0.5">
-                    Tarikh tutup: {new Date(event.registrationDeadline).toLocaleString('ms-MY')}
+                    Tarikh tutup: {new Date(event.submissionDeadline || event.registrationDeadline!).toLocaleString('ms-MY')}
                   </div>
                 )}
               </div>
@@ -218,16 +246,24 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
             </h3>
             <div className="bg-white/60 border border-slate-100 p-4 rounded-2xl space-y-2 text-xs">
               <div className="flex items-start gap-2">
-                <span className="font-bold text-slate-800 min-w-[120px]">Syarat Kelayakan:</span>
+                <span className="font-bold text-slate-800 min-w-[140px]">Kaedah Pendaftaran:</span>
+                <span className="text-indigo-700 font-bold">
+                  {event.registrationMode === 'admin' ? 'WhatsApp Admin / Urusetia' : 'Google Form Rasmi'}
+                </span>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="font-bold text-slate-800 min-w-[140px]">Syarat Kelayakan:</span>
                 <span className="text-slate-600">{event.eligibility}</span>
               </div>
               <div className="flex items-start gap-2">
-                <span className="font-bold text-slate-800 min-w-[120px]">MARA MERIT:</span>
-                <span className="text-emerald-700 font-bold">Disediakan untuk semua peserta hadir</span>
+                <span className="font-bold text-slate-800 min-w-[140px]">MARA MERIT:</span>
+                <span className="text-emerald-700 font-bold">Disediakan untuk semua peserta berdaftar</span>
               </div>
               <div className="flex items-start gap-2">
-                <span className="font-bold text-slate-800 min-w-[120px]">Hubungi Urusetia:</span>
-                <span className="text-indigo-600 font-bold">{event.contact}</span>
+                <span className="font-bold text-slate-800 min-w-[140px]">Hubungi Urusetia:</span>
+                <span className="text-indigo-600 font-bold">
+                  {event.organiserWhatsApp ? `${event.contact || 'Urusetia'} (${event.organiserWhatsApp})` : event.contact}
+                </span>
               </div>
             </div>
           </div>
@@ -302,22 +338,34 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
           </button>
 
           {isRegistrationAvailable ? (
-            <button
-              onClick={() => {
-                onClose();
-                onRegister(event);
-              }}
-              className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 px-5 rounded-xl text-xs sm:text-sm font-extrabold shadow-lg shadow-indigo-200 transition-all flex items-center justify-center gap-2"
-            >
-              <span>Daftar</span>
-              <ExternalLink className="w-4 h-4" />
-            </button>
+            event.registrationMode === 'google_form' && event.registrationUrl ? (
+              <a
+                href={event.registrationUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 px-5 rounded-xl text-xs sm:text-sm font-extrabold shadow-lg shadow-indigo-200 transition-all flex items-center justify-center gap-2"
+              >
+                <span>Buka Google Form Rasmi</span>
+                <ExternalLink className="w-4 h-4" />
+              </a>
+            ) : (
+              <button
+                onClick={() => {
+                  onClose();
+                  onRegister(event);
+                }}
+                className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 px-5 rounded-xl text-xs sm:text-sm font-extrabold shadow-lg shadow-indigo-200 transition-all flex items-center justify-center gap-2"
+              >
+                <span>Daftar via WhatsApp Admin</span>
+                <Send className="w-4 h-4" />
+              </button>
+            )
           ) : (
             <button
               disabled
               className="flex-1 bg-slate-200 text-slate-500 py-2.5 px-5 rounded-xl text-xs font-bold cursor-not-allowed"
             >
-              Pendaftaran Tidak Dibuka / Ditutup
+              {liveStatus === 'Archived' ? 'Acara Telah Diarkibkan' : 'Pendaftaran Tidak Dibuka / Ditutup'}
             </button>
           )}
         </div>
@@ -326,3 +374,4 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
     </div>
   );
 };
+

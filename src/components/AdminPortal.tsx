@@ -22,13 +22,17 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState<Exclude<EventCategory, 'Semua'>>('Pertandingan');
+  const [eventMode, setEventMode] = useState<'physical' | 'online'>('physical');
   const [date, setDate] = useState('2026-08-30');
   const [startTime, setStartTime] = useState('08:00 AM');
   const [endTime, setEndTime] = useState('05:00 PM');
+  const [submissionDeadline, setSubmissionDeadline] = useState('2026-08-30T23:59');
   const [location, setLocation] = useState('Dewan Besar KPMBP');
   const [organiser, setOrganiser] = useState('Urusetia KPMBP');
   const [image, setImage] = useState('');
   const [imageUploadMode, setImageUploadMode] = useState<'file' | 'url'>('file');
+  const [registrationMode, setRegistrationMode] = useState<'admin' | 'google_form'>('admin');
+  const [organiserWhatsApp, setOrganiserWhatsApp] = useState('0123456789');
   const [registrationUrl, setRegistrationUrl] = useState('');
   const [registrationDeadline, setRegistrationDeadline] = useState('2026-08-28T23:59');
   const [status, setStatus] = useState<EventStatus>('Registration Open');
@@ -53,12 +57,16 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     setTitle('');
     setDescription('');
     setCategory('Pertandingan');
+    setEventMode('physical');
     setDate('2026-09-01');
     setStartTime('09:00 AM');
     setEndTime('01:00 PM');
+    setSubmissionDeadline('2026-09-01T23:59');
     setLocation('Dewan Besar KPMBP');
     setOrganiser('Majlis Perwakilan Pelajar KPMBP');
     setImage('');
+    setRegistrationMode('admin');
+    setOrganiserWhatsApp('0123456789');
     setRegistrationUrl('');
     setRegistrationDeadline('2026-08-29T23:59');
     setStatus('Registration Open');
@@ -72,12 +80,16 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     setTitle(evt.title);
     setDescription(evt.description);
     setCategory(evt.category);
+    setEventMode(evt.eventMode || 'physical');
     setDate(evt.date);
-    setStartTime(evt.startTime);
-    setEndTime(evt.endTime);
-    setLocation(evt.location);
+    setStartTime(evt.startTime || '09:00 AM');
+    setEndTime(evt.endTime || '05:00 PM');
+    setSubmissionDeadline(evt.submissionDeadline || (evt.date ? `${evt.date}T23:59` : '2026-09-01T23:59'));
+    setLocation(evt.location || '');
     setOrganiser(evt.organiser);
     setImage(evt.image || '');
+    setRegistrationMode(evt.registrationMode || (evt.registrationUrl ? 'google_form' : 'admin'));
+    setOrganiserWhatsApp(evt.organiserWhatsApp || '0123456789');
     setRegistrationUrl(evt.registrationUrl || '');
     setRegistrationDeadline(evt.registrationDeadline || '');
     setStatus(evt.status);
@@ -114,44 +126,66 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
   const handleSaveForm = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title || !description || !location || !organiser) return;
+    if (!title || !description || !organiser) return;
+
+    // Validation rules based on Mode
+    if (eventMode === 'physical') {
+      if (!location.trim()) {
+        alert('Sila masukkan Lokasi Kampus untuk acara fizikal.');
+        return;
+      }
+      if (!startTime.trim() || !endTime.trim()) {
+        alert('Sila masukkan Masa Mula dan Masa Tamat untuk acara fizikal.');
+        return;
+      }
+    } else {
+      if (!submissionDeadline) {
+        alert('Sila tetapkan Waktu Due / Tarikh & Masa Akhir Submission untuk acara online.');
+        return;
+      }
+    }
+
+    if (registrationMode === 'admin') {
+      if (!organiserWhatsApp.trim()) {
+        alert('Sila masukkan No. WhatsApp Penganjur untuk pendaftaran dalaman.');
+        return;
+      }
+    } else {
+      if (!registrationUrl.trim()) {
+        alert('Sila masukkan Pautan Google Form Pendaftaran.');
+        return;
+      }
+    }
+
+    const finalEventPayload: Omit<KpmbpEvent, 'id'> = {
+      title,
+      description,
+      category,
+      date,
+      startTime: eventMode === 'physical' ? startTime : '',
+      endTime: eventMode === 'physical' ? endTime : '',
+      location: eventMode === 'physical' ? location : '',
+      organiser,
+      image: image.trim() || undefined,
+      eventMode,
+      registrationMode,
+      organiserWhatsApp: registrationMode === 'admin' ? organiserWhatsApp.trim() : undefined,
+      submissionDeadline: eventMode === 'online' ? submissionDeadline : undefined,
+      registrationUrl: registrationMode === 'google_form' ? registrationUrl.trim() : undefined,
+      registrationDeadline: registrationDeadline || (eventMode === 'online' ? submissionDeadline : undefined),
+      status,
+      eligibility,
+      contact
+    };
 
     if (editingEvent) {
       onUpdateEvent({
         ...editingEvent,
-        title,
-        description,
-        category,
-        date,
-        startTime,
-        endTime,
-        location,
-        organiser,
-        image: image.trim() || undefined,
-        registrationUrl: registrationUrl || undefined,
-        registrationDeadline: registrationDeadline || undefined,
-        status,
-        eligibility,
-        contact
+        ...finalEventPayload
       });
       setEditingEvent(null);
     } else {
-      onCreateEvent({
-        title,
-        description,
-        category,
-        date,
-        startTime,
-        endTime,
-        location,
-        organiser,
-        image: image.trim() || undefined,
-        registrationUrl: registrationUrl || undefined,
-        registrationDeadline: registrationDeadline || undefined,
-        status,
-        eligibility,
-        contact
-      });
+      onCreateEvent(finalEventPayload);
       setIsCreating(false);
     }
   };
@@ -231,20 +265,35 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Status Pendaftaran *</label>
-              <select
-                value={status}
-                onChange={(e) => setStatus(e.target.value as any)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-              >
-                {statuses.map((s) => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Mod Acara (Event Mode) *</label>
+              <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-xl border border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setEventMode('physical')}
+                  className={`py-1.5 rounded-lg text-xs font-bold transition-all ${
+                    eventMode === 'physical'
+                      ? 'bg-white text-indigo-600 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  🏛️ Fizikal (Kampus)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEventMode('online')}
+                  className={`py-1.5 rounded-lg text-xs font-bold transition-all ${
+                    eventMode === 'online'
+                      ? 'bg-indigo-600 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  🌐 Online / Atas Talian
+                </button>
+              </div>
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Tarikh (YYYY-MM-DD) *</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Tarikh Acara (YYYY-MM-DD) *</label>
               <input
                 type="date"
                 required
@@ -254,40 +303,63 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Masa Mula</label>
-                <input
-                  type="text"
-                  value={startTime}
-                  onChange={(e) => setStartTime(e.target.value)}
-                  placeholder="08:00 AM"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Masa Tamat</label>
-                <input
-                  type="text"
-                  value={endTime}
-                  onChange={(e) => setEndTime(e.target.value)}
-                  placeholder="05:00 PM"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                />
-              </div>
-            </div>
+            {/* Conditional fields based on Event Mode */}
+            {eventMode === 'physical' ? (
+              <>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Masa Mula *</label>
+                    <input
+                      type="text"
+                      required
+                      value={startTime}
+                      onChange={(e) => setStartTime(e.target.value)}
+                      placeholder="08:00 AM"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Masa Tamat *</label>
+                    <input
+                      type="text"
+                      required
+                      value={endTime}
+                      onChange={(e) => setEndTime(e.target.value)}
+                      placeholder="05:00 PM"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                    />
+                  </div>
+                </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Lokasi Kampus *</label>
-              <input
-                type="text"
-                required
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                placeholder="Dewan Besar KPMBP / Bilik Seminar"
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-              />
-            </div>
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Lokasi Kampus *</label>
+                  <input
+                    type="text"
+                    required
+                    value={location}
+                    onChange={(e) => setLocation(e.target.value)}
+                    placeholder="Dewan Besar KPMBP / Bilik Seminar Aras 3"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                  />
+                </div>
+              </>
+            ) : (
+              <div className="md:col-span-1 bg-amber-50/70 border border-amber-200 rounded-2xl p-3">
+                <label className="block text-xs font-black text-amber-900 mb-1">
+                  ⏰ Due Submission (Tarikh & Waktu Akhir Penghantaran) *
+                </label>
+                <input
+                  type="datetime-local"
+                  required
+                  value={submissionDeadline}
+                  onChange={(e) => setSubmissionDeadline(e.target.value)}
+                  className="w-full bg-white border border-amber-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500/20"
+                />
+                <p className="text-[10px] text-amber-700 font-medium mt-1">
+                  Masa mula, tamat & lokasi fizikal disembunyikan secara automatik untuk pertandingan/acara online.
+                </p>
+              </div>
+            )}
 
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">Penganjur / Kelab / Unit *</label>
@@ -302,22 +374,118 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Pautan Form Pendaftaran (Pilihan)</label>
-              <input
-                type="url"
-                value={registrationUrl}
-                onChange={(e) => setRegistrationUrl(e.target.value)}
-                placeholder="https://forms.gle/..."
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-              />
+              <label className="block text-xs font-bold text-slate-700 mb-1">Status Acara *</label>
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value as any)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+              >
+                {statuses.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
             </div>
 
+            {/* Registration Mode Section */}
+            <div className="md:col-span-2 bg-slate-50 border border-slate-200/90 rounded-2xl p-4 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <label className="block text-xs font-black text-slate-900">
+                    Kaedah Pendaftaran Acara
+                  </label>
+                  <p className="text-[11px] text-slate-500">
+                    Tentukan sama ada pendaftaran diuruskan oleh Admin Portal atau Google Form luar.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-slate-600">Uruskan Pendaftaran oleh Admin:</span>
+                  <div className="inline-flex bg-slate-200 p-0.5 rounded-xl">
+                    <button
+                      type="button"
+                      onClick={() => setRegistrationMode('admin')}
+                      className={`px-3 py-1 text-xs font-extrabold rounded-lg transition-all ${
+                        registrationMode === 'admin'
+                          ? 'bg-emerald-600 text-white shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      YES
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRegistrationMode('google_form')}
+                      className={`px-3 py-1 text-xs font-extrabold rounded-lg transition-all ${
+                        registrationMode === 'google_form'
+                          ? 'bg-indigo-600 text-white shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      NO (Google Form)
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {registrationMode === 'admin' ? (
+                <div className="bg-emerald-50/70 border border-emerald-200 rounded-xl p-3">
+                  <label className="block text-xs font-bold text-emerald-950 mb-1">
+                    No. WhatsApp Penganjur (Untuk Terima Ringkasan Peserta) *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={organiserWhatsApp}
+                    onChange={(e) => setOrganiserWhatsApp(e.target.value)}
+                    placeholder="Contoh: 0123456789 / 60123456789"
+                    className="w-full bg-white border border-emerald-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                  />
+                  <p className="text-[10px] text-emerald-800 mt-1">
+                    Peserta akan mengisi borang dalaman dan secara automatik menjana butang WhatsApp untuk menghantar ringkasan pendaftaran terus kepada nombor ini.
+                  </p>
+                </div>
+              ) : (
+                <div className="bg-indigo-50/70 border border-indigo-200 rounded-xl p-3">
+                  <label className="block text-xs font-bold text-indigo-950 mb-1">
+                    Pautan Google Form Pendaftaran *
+                  </label>
+                  <input
+                    type="url"
+                    required
+                    value={registrationUrl}
+                    onChange={(e) => setRegistrationUrl(e.target.value)}
+                    placeholder="https://forms.gle/xxxxxxxxxxxx"
+                    className="w-full bg-white border border-indigo-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                  />
+                  <p className="text-[10px] text-indigo-800 mt-1">
+                    Peserta yang menekan butang "Daftar" akan terus dibawa ke Google Form ini tanpa borang dalaman.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {eventMode === 'physical' && (
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Tarikh & Masa Tutup Pendaftaran (Pilihan)</label>
+                <input
+                  type="datetime-local"
+                  value={registrationDeadline}
+                  onChange={(e) => setRegistrationDeadline(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                />
+              </div>
+            )}
+
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Tarikh & Masa Tutup Pendaftaran</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Pegawai In-Charge / No. Telefon Urusetia (Untuk Pertanyaan) *
+              </label>
               <input
-                type="datetime-local"
-                value={registrationDeadline}
-                onChange={(e) => setRegistrationDeadline(e.target.value)}
+                type="text"
+                required
+                value={contact}
+                onChange={(e) => setContact(e.target.value)}
+                placeholder="Contoh: En. Razak (012-3456789) / Urusetia MPP"
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
               />
             </div>
@@ -487,17 +655,18 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
           <thead>
             <tr className="border-b border-slate-200/80 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
               <th className="pb-3 pr-2">Tajuk Event</th>
-              <th className="pb-3 px-2">Tarikh</th>
+              <th className="pb-3 px-2">Mod / Tarikh</th>
               <th className="pb-3 px-2">Kategori</th>
+              <th className="pb-3 px-2">Pendaftaran</th>
               <th className="pb-3 px-2">Status</th>
-              <th className="pb-3 px-2">Lokasi</th>
+              <th className="pb-3 px-2">Lokasi / Due</th>
               <th className="pb-3 pl-2 text-right">Tindakan</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 font-medium">
             {events.map((evt) => (
               <tr key={evt.id} className="hover:bg-slate-50/80 transition-colors">
-                <td className="py-3 pr-2 font-bold text-slate-900 max-w-[240px]">
+                <td className="py-3 pr-2 font-bold text-slate-900 max-w-[220px]">
                   <div className="flex items-center gap-2">
                     {evt.image ? (
                       <img
@@ -517,7 +686,14 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                   </div>
                 </td>
                 <td className="py-3 px-2 text-slate-600 whitespace-nowrap">
-                  {evt.date}
+                  <div className="flex items-center gap-1.5">
+                    <span className={`px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase ${
+                      evt.eventMode === 'online' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700'
+                    }`}>
+                      {evt.eventMode === 'online' ? 'Online' : 'Fizikal'}
+                    </span>
+                    <span className="text-[11px] font-semibold">{evt.date}</span>
+                  </div>
                 </td>
                 <td className="py-3 px-2">
                   <span className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded text-[10px] font-bold">
@@ -525,12 +701,27 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                   </span>
                 </td>
                 <td className="py-3 px-2">
-                  <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded text-[10px] font-bold">
+                  {evt.registrationMode === 'admin' ? (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded text-[10px] font-bold">
+                      <span>WhatsApp Admin</span>
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded text-[10px] font-bold">
+                      <span>Google Form</span>
+                    </span>
+                  )}
+                </td>
+                <td className="py-3 px-2">
+                  <span className="px-2 py-0.5 bg-slate-100 text-slate-800 rounded text-[10px] font-bold">
                     {evt.status}
                   </span>
                 </td>
-                <td className="py-3 px-2 text-slate-500 max-w-[150px] truncate">
-                  {evt.location}
+                <td className="py-3 px-2 text-slate-600 max-w-[140px] truncate text-[11px]">
+                  {evt.eventMode === 'online' ? (
+                    <span className="text-amber-700 font-bold">Due: {evt.submissionDeadline ? evt.submissionDeadline.replace('T', ' ') : 'Atas Talian'}</span>
+                  ) : (
+                    evt.location || '-'
+                  )}
                 </td>
                 <td className="py-3 pl-2 text-right whitespace-nowrap space-x-1">
                   <button

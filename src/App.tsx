@@ -10,7 +10,7 @@ import { CalendarView } from './components/CalendarView';
 import { RegistrationModal } from './components/RegistrationModal';
 import { AdminPortal } from './components/AdminPortal';
 import { AdminPinModal } from './components/AdminPinModal';
-import { sortEventsByNearestDue } from './utils/calendar';
+import { sortEventsByNearestDue, getCategoryButtonClass } from './utils/calendar';
 import { Sparkles, Calendar as CalendarIcon, Filter, Flame, CheckCircle2, ShieldCheck, Bookmark, Lock, KeyRound } from 'lucide-react';
 
 export default function App() {
@@ -240,15 +240,14 @@ export default function App() {
 
                   {/* Category Quick Selector */}
                   <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-                    {(['Semua', 'Pertandingan', 'Bengkel', 'Sukan', 'Kebudayaan', 'Kerjaya'] as EventCategory[]).map((cat) => (
+                    {(['Semua', 'Pertandingan', 'Program Pelajar', 'Sukan', 'Kebudayaan', 'Akademik', 'Bengkel', 'Kerjaya'] as EventCategory[]).map((cat) => (
                       <button
                         key={cat}
                         onClick={() => setSelectedCategory(cat)}
-                        className={`px-3 py-1 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
+                        className={`px-3 py-1 rounded-lg text-xs transition-all whitespace-nowrap ${getCategoryButtonClass(
+                          cat,
                           selectedCategory === cat
-                            ? 'bg-indigo-600 text-white shadow-2xs'
-                            : 'bg-white/60 text-slate-600 border border-white/80 hover:bg-white'
-                        }`}
+                        )}`}
                       >
                         {cat}
                       </button>
@@ -332,15 +331,17 @@ export default function App() {
                   <span>Disimpan ({savedEventIds.length})</span>
                 </button>
 
-                {(['Semua', 'Pertandingan', 'Bengkel', 'Program Pelajar', 'Kelab & Persatuan', 'Akademik', 'Kebudayaan', 'Sukan', 'Kerjaya', 'Institusi'] as EventCategory[]).map((cat) => (
+                {(['Semua', 'Pertandingan', 'Program Pelajar', 'Sukan', 'Kebudayaan', 'Akademik', 'Bengkel', 'Kelab & Persatuan', 'Kerjaya', 'Institusi'] as EventCategory[]).map((cat) => (
                   <button
                     key={cat}
-                    onClick={() => setSelectedCategory(cat)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+                    onClick={() => {
+                      setShowOnlySaved(false);
+                      setSelectedCategory(cat);
+                    }}
+                    className={`px-3 py-1.5 rounded-xl text-xs transition-all whitespace-nowrap ${getCategoryButtonClass(
+                      cat,
                       selectedCategory === cat && !showOnlySaved
-                        ? 'bg-indigo-600 text-white shadow-xs'
-                        : 'bg-white/80 text-slate-600 border border-slate-200/80 hover:bg-white'
-                    }`}
+                    )}`}
                   >
                     {cat}
                   </button>
@@ -467,8 +468,8 @@ export default function App() {
 
       {/* Footer */}
       <footer className="mt-auto border-t border-white/40 bg-white/30 backdrop-blur-md py-6 z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-600 font-medium">
-          <div className="flex items-center gap-2">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-center text-xs text-slate-600 font-medium text-center">
+          <div className="flex items-center justify-center gap-2">
             <img 
               src="https://raw.githubusercontent.com/syncrozz/syncrozz-assets/main/logo/Event%20KPMBP/android-chrome-192x192.png" 
               alt="Event KPMBP Logo" 
@@ -485,27 +486,6 @@ export default function App() {
                 Syncrozz
               </a>
             </span>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-6 text-slate-600 font-semibold">
-            <a 
-              href="https://wasap.my/60145313756" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="hover:text-indigo-600 transition-colors flex items-center gap-1"
-            >
-              Hubungi Syncrozz (WhatsApp)
-            </a>
-            <button 
-              onClick={() => {
-                if (!isAdminUnlocked) setIsAdminPinOpen(true);
-                else setCurrentTab('admin');
-              }}
-              className="hover:text-indigo-600 transition-colors flex items-center gap-1 font-bold"
-            >
-              <ShieldCheck className="w-3.5 h-3.5 text-indigo-600" />
-              <span>{isAdminUnlocked ? 'Admin Active' : 'Admin Mode'}</span>
-            </button>
           </div>
         </div>
       </footer>

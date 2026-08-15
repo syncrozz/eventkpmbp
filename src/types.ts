@@ -19,7 +19,12 @@ export type EventStatus =
   | 'Fully Booked'
   | 'Ongoing'
   | 'Completed'
-  | 'Cancelled';
+  | 'Cancelled'
+  | 'Archived';
+
+export type EventMode = 'physical' | 'online';
+
+export type RegistrationMode = 'admin' | 'google_form';
 
 export interface KpmbpEvent {
   id: string;
@@ -32,6 +37,10 @@ export interface KpmbpEvent {
   location: string;
   organiser: string;
   image?: string;
+  eventMode?: EventMode; // 'physical' | 'online' (default fallback: physical)
+  registrationMode?: RegistrationMode; // 'admin' | 'google_form' (default fallback: google_form if registrationUrl exists, else admin)
+  organiserWhatsApp?: string; // Contact phone / WhatsApp number for admin registration
+  submissionDeadline?: string; // ISO datetime YYYY-MM-DDTHH:mm for online competitions / submissions
   registrationUrl?: string;
   registrationDeadline?: string; // ISO datetime YYYY-MM-DDTHH:mm
   status: EventStatus;
@@ -57,4 +66,4 @@ export interface RegistrationRecord {
   timestamp: string;
 }
 
-export type ViewTab = 'discover' | 'events' | 'calendar' | 'dont-miss' | 'admin';
+export type ViewTab = 'discover' | 'events' | 'calendar' | 'dont-miss' | 'archive' | 'admin';

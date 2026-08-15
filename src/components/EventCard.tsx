@@ -1,7 +1,7 @@
 import React from 'react';
 import { KpmbpEvent } from '../types';
-import { formatDateMalay, getTimeRemainingMalay } from '../utils/calendar';
-import { Clock, MapPin, User, ArrowRight, Flame, AlertTriangle, Bookmark, CheckCircle2 } from 'lucide-react';
+import { formatDateMalay, getTimeRemainingMalay, getCategoryBadgeClass, getDynamicEventStatus } from '../utils/calendar';
+import { Clock, MapPin, User, ArrowRight, Flame, AlertTriangle, Bookmark, Globe, ExternalLink } from 'lucide-react';
 
 interface EventCardProps {
   event: KpmbpEvent;
@@ -19,33 +19,12 @@ export const EventCard: React.FC<EventCardProps> = ({
   onToggleSave
 }) => {
   const { day, month } = formatDateMalay(event.date);
-  const timeRemaining = getTimeRemainingMalay(event.registrationDeadline);
+  const liveStatus = getDynamicEventStatus(event);
+  const isOnline = event.eventMode === 'online';
+  const timeRemaining = getTimeRemainingMalay(isOnline ? event.submissionDeadline || event.registrationDeadline : event.registrationDeadline);
 
-  // Subtle, refined category badges
-  const getCategoryColor = (cat: string) => {
-    switch (cat) {
-      case 'Kebudayaan':
-        return 'bg-amber-50 text-amber-800 border-amber-200/70';
-      case 'Kerjaya':
-        return 'bg-indigo-50 text-indigo-800 border-indigo-200/70';
-      case 'Sukan':
-        return 'bg-emerald-50 text-emerald-800 border-emerald-200/70';
-      case 'Akademik':
-        return 'bg-blue-50 text-blue-800 border-blue-200/70';
-      case 'Pertandingan':
-        return 'bg-rose-50 text-rose-800 border-rose-200/70';
-      case 'Program Pelajar':
-        return 'bg-purple-50 text-purple-800 border-purple-200/70';
-      case 'Kelab & Persatuan':
-        return 'bg-teal-50 text-teal-800 border-teal-200/70';
-      case 'Bengkel':
-        return 'bg-cyan-50 text-cyan-800 border-cyan-200/70';
-      case 'Institusi':
-        return 'bg-slate-100 text-slate-800 border-slate-200';
-      default:
-        return 'bg-slate-50 text-slate-700 border-slate-200';
-    }
-  };
+  // Use unified pastel category badges
+  const getCategoryColor = (cat: string) => getCategoryBadgeClass(cat);
 
   // Distinct Status Badges
   const getStatusBadge = (status: string) => {
@@ -88,6 +67,12 @@ export const EventCard: React.FC<EventCardProps> = ({
             SELESAI
           </span>
         );
+      case 'Archived':
+        return (
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-200 text-slate-500">
+            DIARKIBKAN
+          </span>
+        );
       default:
         return (
           <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-700 border border-blue-200">
@@ -98,14 +83,14 @@ export const EventCard: React.FC<EventCardProps> = ({
   };
 
   const isRegistrationAvailable =
-    event.status === 'Registration Open' || event.status === 'Registration Closing Soon';
+    liveStatus === 'Registration Open' || liveStatus === 'Registration Closing Soon';
 
   return (
     <div className="group bg-white/60 backdrop-blur-xl border border-white/80 rounded-2xl p-4 sm:p-5 shadow-2xs hover:shadow-md transition-all duration-200 flex flex-col justify-between h-full relative overflow-hidden hover:border-indigo-300 hover:-translate-y-0.5">
       
       <div>
         {/* Top Priority: Urgent Deadline Banner (If Closing Soon or Urgent) */}
-        {timeRemaining && event.status === 'Registration Closing Soon' && (
+        {timeRemaining && liveStatus === 'Registration Closing Soon' && (
           <div className="mb-3 bg-gradient-to-r from-rose-50 to-rose-100/80 border border-rose-200 rounded-xl p-2 px-2.5 text-xs text-rose-900 flex items-center justify-between gap-2 shadow-2xs">
             <div className="flex items-center gap-1.5 min-w-0">
               <AlertTriangle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
@@ -117,13 +102,26 @@ export const EventCard: React.FC<EventCardProps> = ({
           </div>
         )}
 
-        {/* Header Row: Category, Status, Save Button, Date Box */}
+        {/* Header Row: Category, Mode Badge, Status, Save Button, Date Box */}
         <div className="flex items-start justify-between gap-2 mb-3">
           <div className="flex flex-wrap items-center gap-1.5">
             <span className={`px-2 py-0.5 text-[10px] font-bold rounded-lg border ${getCategoryColor(event.category)}`}>
               {event.category}
             </span>
-            {getStatusBadge(event.status)}
+            
+            {/* Event Mode Tag */}
+            {isOnline ? (
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-black rounded-md bg-amber-50 text-amber-700 border border-amber-200">
+                <Globe className="w-3 h-3 text-amber-600" />
+                ONLINE
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-black rounded-md bg-slate-100 text-slate-700 border border-slate-200">
+                FIZIKAL
+              </span>
+            )}
+
+            {getStatusBadge(liveStatus)}
           </div>
 
           <div className="flex items-center gap-1.5 shrink-0">
@@ -178,16 +176,28 @@ export const EventCard: React.FC<EventCardProps> = ({
           {event.title}
         </h3>
 
-        {/* Key Attributes */}
+        {/* Key Attributes (Adapted to Physical vs Online) */}
         <div className="text-xs text-slate-600 space-y-1.5 mb-3">
-          <div className="flex items-center gap-2">
-            <Clock className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
-            <span className="font-medium">{event.startTime} {event.endTime ? `– ${event.endTime}` : ''}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <MapPin className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
-            <span className="truncate font-medium">{event.location}</span>
-          </div>
+          {isOnline ? (
+            <div className="flex items-center gap-2 text-amber-900 bg-amber-50/70 px-2 py-1 rounded-lg border border-amber-200/60">
+              <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+              <span className="font-bold text-[11px]">
+                Due Submission: {event.submissionDeadline ? event.submissionDeadline.replace('T', ' ') : 'Sebelum 11:59 PM'}
+              </span>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center gap-2">
+                <Clock className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                <span className="font-medium">{event.startTime} {event.endTime ? `– ${event.endTime}` : ''}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <MapPin className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                <span className="truncate font-medium">{event.location || 'Kampus KPMBP'}</span>
+              </div>
+            </>
+          )}
+
           <div className="flex items-center gap-2">
             <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
             <span className="truncate text-slate-500 text-[11px]">{event.organiser}</span>
@@ -213,19 +223,31 @@ export const EventCard: React.FC<EventCardProps> = ({
         </button>
 
         {isRegistrationAvailable ? (
-          <button
-            onClick={() => onRegister(event)}
-            className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-3 rounded-xl text-xs font-bold shadow-sm shadow-indigo-200 transition-all flex items-center justify-center gap-1 active:scale-95"
-          >
-            <span>Daftar</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </button>
+          event.registrationMode === 'google_form' && event.registrationUrl ? (
+            <a
+              href={event.registrationUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-3 rounded-xl text-xs font-bold shadow-sm shadow-indigo-200 transition-all flex items-center justify-center gap-1 active:scale-95"
+            >
+              <span>Google Form</span>
+              <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+          ) : (
+            <button
+              onClick={() => onRegister(event)}
+              className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-3 rounded-xl text-xs font-bold shadow-sm shadow-indigo-200 transition-all flex items-center justify-center gap-1 active:scale-95"
+            >
+              <span>Daftar</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          )
         ) : (
           <button
             disabled
             className="px-3 bg-slate-100 text-slate-400 border border-slate-200 py-2 rounded-xl text-[11px] font-bold cursor-not-allowed"
           >
-            Tutup
+            {liveStatus === 'Archived' ? 'Diarkibkan' : 'Tutup'}
           </button>
         )}
       </div>
@@ -233,4 +255,5 @@ export const EventCard: React.FC<EventCardProps> = ({
     </div>
   );
 };
+
 

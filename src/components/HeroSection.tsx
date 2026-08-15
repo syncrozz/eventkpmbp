@@ -49,9 +49,9 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
 
             <button
               onClick={() => onSelectTab('calendar')}
-              className="bg-white/80 hover:bg-white text-slate-700 border border-slate-200/90 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 backdrop-blur-md shadow-2xs transition-all hover:border-indigo-300"
+              className="bg-amber-100 hover:bg-amber-200/90 text-amber-950 border border-amber-300/80 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 shadow-2xs transition-all hover:border-amber-400 active:scale-95"
             >
-              <Calendar className="w-4 h-4 text-indigo-600" />
+              <Calendar className="w-4 h-4 text-amber-800" />
               <span>Kalendar</span>
             </button>
 
