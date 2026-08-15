@@ -208,8 +208,14 @@ export default function App() {
   // Admin Actions with Firebase Firestore
   const handleCreateEvent = async (newEventData: Omit<KpmbpEvent, 'id'>) => {
     try {
-      await createEventInFirestore(newEventData);
-      showToast('Acara baharu berjaya diterbitkan & disimpan ke Firebase Cloud!');
+      const newId = await createEventInFirestore(newEventData);
+      const createdEvent: KpmbpEvent = { ...newEventData, id: newId };
+      setEvents((prev) => {
+        const next = [createdEvent, ...prev.filter((e) => e.id !== newId)];
+        try { localStorage.setItem('kpmbp_events_v1', JSON.stringify(next)); } catch {}
+        return next;
+      });
+      showToast(`Acara "${newEventData.title}" berjaya diterbitkan & disimpan ke Firebase Cloud!`);
     } catch (err: any) {
       console.error('Error creating event in Firestore:', err);
       // Fallback local storage
@@ -220,22 +226,28 @@ export default function App() {
         try { localStorage.setItem('kpmbp_events_v1', JSON.stringify(next)); } catch {}
         return next;
       });
-      showToast(`Peringatan: Gagal sync Firebase (${err?.message || 'Ralat sambungan'}). Disimpan sementara di peranti.`);
+      showToast(`Peringatan: Gagal sync Firebase (${err?.message || 'Ralat sambungan'}). Disimpan dalam peranti.`);
     }
   };
 
   const handleUpdateEvent = async (updated: KpmbpEvent) => {
+    // 1. Immediately update React state & localStorage for instantaneous reflection
+    setEvents((prev) => {
+      const next = prev.map((e) => (e.id === updated.id ? updated : e));
+      try { localStorage.setItem('kpmbp_events_v1', JSON.stringify(next)); } catch {}
+      return next;
+    });
+
+    if (selectedEventForDetail?.id === updated.id) {
+      setSelectedEventForDetail(updated);
+    }
+
     try {
       await updateEventInFirestore(updated);
-      showToast('Maklumat acara telah dikemaskini dalam Firebase Cloud.');
+      showToast(`Maklumat "${updated.title}" telah berjaya dikemaskini & disimpan ke Firebase Cloud.`);
     } catch (err: any) {
       console.error('Error updating event in Firestore:', err);
-      setEvents((prev) => {
-        const next = prev.map((e) => (e.id === updated.id ? updated : e));
-        try { localStorage.setItem('kpmbp_events_v1', JSON.stringify(next)); } catch {}
-        return next;
-      });
-      showToast(`Peringatan: Gagal sync Firebase. Maklumat dikemaskini sementara di peranti.`);
+      showToast(`Peringatan: Gagal sync Firebase (${err?.message || 'Ralat sambungan'}). Disimpan sementara di peranti.`);
     }
   };
 
@@ -411,6 +423,9 @@ export default function App() {
                         onRegister={setSelectedEventForRegistration}
                         isSaved={savedEventIds.includes(event.id)}
                         onToggleSave={handleToggleSave}
+                        isAdmin={isAdminUnlocked}
+                        onEdit={handleTriggerEdit}
+                        onDelete={handleRequestDelete}
                       />
                     ))}
                   </div>

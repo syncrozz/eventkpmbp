@@ -216,7 +216,8 @@ export async function updateEventInFirestore(event: KpmbpEvent): Promise<void> {
       ...event,
       updatedAt: new Date().toISOString()
     });
-    await setDoc(docRef, payload, { merge: true });
+    // Set doc cleanly so updated title, dates, deadlines, and fields replace old version
+    await setDoc(docRef, payload);
   } catch (error) {
     console.error('Error in updateEventInFirestore:', error);
     throw error;
