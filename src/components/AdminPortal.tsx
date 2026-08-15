@@ -1,6 +1,11 @@
-import React, { useState, useRef } from 'react';
-import { KpmbpEvent, EventCategory, EventStatus } from '../types';
-import { Plus, Trash2, Edit2, ShieldCheck, Check, Sparkles, AlertCircle, Image as ImageIcon, Upload, Link as LinkIcon, X, Eye } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { KpmbpEvent, EventCategory, EventStatus, RegistrationRecord, RegistrationMode } from '../types';
+import { subscribeToRegistrations } from '../services/firebase';
+import { 
+  Plus, Trash2, Edit2, ShieldCheck, Check, Sparkles, AlertCircle, 
+  Image as ImageIcon, Upload, Link as LinkIcon, X, Eye, Cloud, Users, 
+  Search, Phone, Mail, Calendar, Download, RefreshCw
+} from 'lucide-react';
 
 interface AdminPortalProps {
   events: KpmbpEvent[];
@@ -15,8 +20,21 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   onUpdateEvent,
   onDeleteEvent
 }) => {
+  const [activeAdminTab, setActiveAdminTab] = useState<'events' | 'registrations'>('events');
+  const [registrations, setRegistrations] = useState<RegistrationRecord[]>([]);
+  const [regSearchQuery, setRegSearchQuery] = useState('');
+  const [selectedRegEventId, setSelectedRegEventId] = useState<string>('all');
+
   const [editingEvent, setEditingEvent] = useState<KpmbpEvent | null>(null);
   const [isCreating, setIsCreating] = useState(false);
+
+  // Subscribe to live student registrations from Firestore
+  useEffect(() => {
+    const unsub = subscribeToRegistrations((list) => {
+      setRegistrations(list);
+    });
+    return () => unsub();
+  }, []);
 
   // Form State
   const [title, setTitle] = useState('');
@@ -31,11 +49,11 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const [organiser, setOrganiser] = useState('Urusetia KPMBP');
   const [image, setImage] = useState('');
   const [imageUploadMode, setImageUploadMode] = useState<'file' | 'url'>('file');
-  const [registrationMode, setRegistrationMode] = useState<'admin' | 'google_form'>('admin');
-  const [organiserWhatsApp, setOrganiserWhatsApp] = useState('0123456789');
+  const [registrationMode, setRegistrationMode] = useState<RegistrationMode>('none');
+  const [organiserWhatsApp, setOrganiserWhatsApp] = useState('');
   const [registrationUrl, setRegistrationUrl] = useState('');
-  const [registrationDeadline, setRegistrationDeadline] = useState('2026-08-28T23:59');
-  const [status, setStatus] = useState<EventStatus>('Registration Open');
+  const [registrationDeadline, setRegistrationDeadline] = useState('');
+  const [status, setStatus] = useState<EventStatus>('Upcoming');
   const [eligibility, setEligibility] = useState('Terbuka kepada semua warga KPMBP');
   const [contact, setContact] = useState('Urusetia KPMBP - 012-3456789');
 
@@ -46,32 +64,27 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     'Akademik', 'Kebudayaan', 'Sukan', 'Kerjaya', 'Institusi', 'Lain-lain'
   ];
 
-  const statuses: EventStatus[] = [
-    'Upcoming', 'Registration Open', 'Registration Closing Soon', 
-    'Registration Closed', 'Fully Booked', 'Ongoing', 'Completed', 'Cancelled'
-  ];
-
   const handleStartCreate = () => {
     setIsCreating(true);
     setEditingEvent(null);
     setTitle('');
     setDescription('');
-    setCategory('Pertandingan');
+    setCategory('Program Pelajar');
     setEventMode('physical');
     setDate('2026-09-01');
     setStartTime('09:00 AM');
     setEndTime('01:00 PM');
     setSubmissionDeadline('2026-09-01T23:59');
-    setLocation('Dewan Besar KPMBP');
-    setOrganiser('Majlis Perwakilan Pelajar KPMBP');
+    setLocation('Kampus KPMBP');
+    setOrganiser('Urusetia KPMBP');
     setImage('');
-    setRegistrationMode('admin');
-    setOrganiserWhatsApp('0123456789');
+    setRegistrationMode('none');
+    setOrganiserWhatsApp('');
     setRegistrationUrl('');
-    setRegistrationDeadline('2026-08-29T23:59');
-    setStatus('Registration Open');
-    setEligibility('Terbuka kepada semua pelajar KPMBP');
-    setContact('Penasihat Program - 012-3456789');
+    setRegistrationDeadline('');
+    setStatus('Upcoming');
+    setEligibility('Terbuka kepada semua warga KPMBP');
+    setContact('Urusetia KPMBP - 012-3456789');
   };
 
   const handleStartEdit = (evt: KpmbpEvent) => {
@@ -88,8 +101,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     setLocation(evt.location || '');
     setOrganiser(evt.organiser);
     setImage(evt.image || '');
-    setRegistrationMode(evt.registrationMode || (evt.registrationUrl ? 'google_form' : 'admin'));
-    setOrganiserWhatsApp(evt.organiserWhatsApp || '0123456789');
+    setRegistrationMode(evt.registrationMode || (evt.registrationUrl ? 'google_form' : (evt.organiserWhatsApp ? 'admin' : 'none')));
+    setOrganiserWhatsApp(evt.organiserWhatsApp || '');
     setRegistrationUrl(evt.registrationUrl || '');
     setRegistrationDeadline(evt.registrationDeadline || '');
     setStatus(evt.status);
@@ -150,7 +163,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
         alert('Sila masukkan No. WhatsApp Penganjur untuk pendaftaran dalaman.');
         return;
       }
-    } else {
+    } else if (registrationMode === 'google_form') {
       if (!registrationUrl.trim()) {
         alert('Sila masukkan Pautan Google Form Pendaftaran.');
         return;
@@ -172,7 +185,9 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       organiserWhatsApp: registrationMode === 'admin' ? organiserWhatsApp.trim() : undefined,
       submissionDeadline: eventMode === 'online' ? submissionDeadline : undefined,
       registrationUrl: registrationMode === 'google_form' ? registrationUrl.trim() : undefined,
-      registrationDeadline: registrationDeadline || (eventMode === 'online' ? submissionDeadline : undefined),
+      registrationDeadline: registrationMode !== 'none'
+        ? (registrationDeadline || (eventMode === 'online' ? submissionDeadline : undefined))
+        : undefined,
       status,
       eligibility,
       contact
@@ -196,27 +211,72 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       {/* Admin Title Card */}
       <div className="bg-white/60 backdrop-blur-xl border border-white/80 rounded-3xl p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-900 text-white rounded-full text-xs font-bold uppercase tracking-wider mb-2">
-            <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            <span>Portal Pentadbir Event</span>
+          <div className="flex flex-wrap items-center gap-2 mb-2">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-900 text-white rounded-full text-xs font-bold uppercase tracking-wider">
+              <ShieldCheck className="w-4 h-4 text-emerald-400" />
+              <span>Portal Pentadbir Event</span>
+            </div>
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full text-[11px] font-bold">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <Cloud className="w-3.5 h-3.5" />
+              <span>Firebase Cloud Live Sync</span>
+            </div>
           </div>
           <h2 className="text-2xl font-black text-slate-900">
             Pengurusan & Penerbitan Acara KPMBP
           </h2>
           <p className="text-xs text-slate-500 mt-1">
-            Tambah, sunting, dan kemaskini status pendaftaran program kampus secara langsung.
+            Data disegerakkan secara langsung dengan pangkalan data awan Firebase Firestore.
           </p>
         </div>
 
         {!isCreating && !editingEvent && (
-          <button
-            onClick={handleStartCreate}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold shadow-lg shadow-indigo-200 flex items-center gap-2 transition-all self-start md:self-auto"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Cipta Event Baharu</span>
-          </button>
+          <div className="flex items-center gap-2 self-start md:self-auto">
+            <button
+              onClick={handleStartCreate}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold shadow-lg shadow-indigo-200 flex items-center gap-2 transition-all"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Cipta Event Baharu</span>
+            </button>
+          </div>
         )}
+      </div>
+
+      {/* Admin Sub Navigation Tabs */}
+      <div className="flex items-center gap-2 border-b border-slate-200/80 pb-2">
+        <button
+          onClick={() => setActiveAdminTab('events')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all ${
+            activeAdminTab === 'events'
+              ? 'bg-slate-900 text-white shadow-sm'
+              : 'text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          <span>Senarai Acara</span>
+          <span className={`px-2 py-0.5 rounded-full text-[10px] ${
+            activeAdminTab === 'events' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
+          }`}>
+            {events.length}
+          </span>
+        </button>
+
+        <button
+          onClick={() => setActiveAdminTab('registrations')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all ${
+            activeAdminTab === 'registrations'
+              ? 'bg-slate-900 text-white shadow-sm'
+              : 'text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          <Users className="w-3.5 h-3.5 text-emerald-400" />
+          <span>Rekod Pendaftaran Peserta</span>
+          <span className={`px-2 py-0.5 rounded-full text-[10px] ${
+            activeAdminTab === 'registrations' ? 'bg-emerald-500 text-white' : 'bg-emerald-100 text-emerald-800'
+          }`}>
+            {registrations.length}
+          </span>
+        </button>
       </div>
 
       {/* Form (Create/Edit) */}
@@ -380,101 +440,190 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                 onChange={(e) => setStatus(e.target.value as any)}
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
               >
-                {statuses.map((s) => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
+                {registrationMode === 'none' ? (
+                  <>
+                    <option value="Upcoming">Upcoming (Akan Datang / Terbuka)</option>
+                    <option value="Ongoing">Ongoing (Sedang Berlangsung)</option>
+                    <option value="Completed">Completed (Telah Selesai)</option>
+                    <option value="Cancelled">Cancelled (Dibatalkan)</option>
+                  </>
+                ) : (
+                  <>
+                    <option value="Registration Open">Registration Open (Pendaftaran Dibuka)</option>
+                    <option value="Registration Closing Soon">Registration Closing Soon (Hampir Tutup)</option>
+                    <option value="Registration Closed">Registration Closed (Pendaftaran Ditutup)</option>
+                    <option value="Fully Booked">Fully Booked (Tempat Penuh)</option>
+                    <option value="Upcoming">Upcoming (Akan Datang)</option>
+                    <option value="Ongoing">Ongoing (Sedang Berlangsung)</option>
+                    <option value="Completed">Completed (Telah Selesai)</option>
+                    <option value="Cancelled">Cancelled (Dibatalkan)</option>
+                  </>
+                )}
               </select>
             </div>
 
-            {/* Registration Mode Section */}
-            <div className="md:col-span-2 bg-slate-50 border border-slate-200/90 rounded-2xl p-4 space-y-3">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <div>
-                  <label className="block text-xs font-black text-slate-900">
-                    Kaedah Pendaftaran Acara
-                  </label>
-                  <p className="text-[11px] text-slate-500">
-                    Tentukan sama ada pendaftaran diuruskan oleh Admin Portal atau Google Form luar.
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-slate-600">Uruskan Pendaftaran oleh Admin:</span>
-                  <div className="inline-flex bg-slate-200 p-0.5 rounded-xl">
-                    <button
-                      type="button"
-                      onClick={() => setRegistrationMode('admin')}
-                      className={`px-3 py-1 text-xs font-extrabold rounded-lg transition-all ${
-                        registrationMode === 'admin'
-                          ? 'bg-emerald-600 text-white shadow-xs'
-                          : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      YES
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setRegistrationMode('google_form')}
-                      className={`px-3 py-1 text-xs font-extrabold rounded-lg transition-all ${
-                        registrationMode === 'google_form'
-                          ? 'bg-indigo-600 text-white shadow-xs'
-                          : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      NO (Google Form)
-                    </button>
-                  </div>
-                </div>
+            {/* Registration Mode Section (Optional Registration) */}
+            <div className="md:col-span-2 bg-slate-50/80 border border-slate-200/90 rounded-2xl p-4 sm:p-5 space-y-4">
+              <div>
+                <label className="block text-xs font-black text-slate-900 uppercase tracking-wider">
+                  Kaedah Pendaftaran Acara (Optional)
+                </label>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Pilih sama ada event ini memerlukan pendaftaran peserta atau merupakan program terbuka tanpa pendaftaran.
+                </p>
               </div>
 
-              {registrationMode === 'admin' ? (
-                <div className="bg-emerald-50/70 border border-emerald-200 rounded-xl p-3">
-                  <label className="block text-xs font-bold text-emerald-950 mb-1">
-                    No. WhatsApp Penganjur (Untuk Terima Ringkasan Peserta) *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={organiserWhatsApp}
-                    onChange={(e) => setOrganiserWhatsApp(e.target.value)}
-                    placeholder="Contoh: 0123456789 / 60123456789"
-                    className="w-full bg-white border border-emerald-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-                  />
-                  <p className="text-[10px] text-emerald-800 mt-1">
-                    Peserta akan mengisi borang dalaman dan secara automatik menjana butang WhatsApp untuk menghantar ringkasan pendaftaran terus kepada nombor ini.
+              {/* 3 Explicit Selection Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRegistrationMode('none');
+                    if (status === 'Registration Open' || status === 'Registration Closing Soon' || status === 'Registration Closed') {
+                      setStatus('Upcoming');
+                    }
+                  }}
+                  className={`p-3.5 rounded-xl border text-left transition-all ${
+                    registrationMode === 'none'
+                      ? 'bg-emerald-50 border-emerald-400 ring-2 ring-emerald-500/20 text-emerald-950 shadow-2xs'
+                      : 'bg-white border-slate-200 hover:border-slate-300 text-slate-700'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-extrabold text-xs">Tiada Pendaftaran</span>
+                    {registrationMode === 'none' && <Check className="w-4 h-4 text-emerald-600 shrink-0" />}
+                  </div>
+                  <p className="text-[10px] text-slate-500 mt-1 leading-snug">
+                    Acara terbuka / walk-in (e.g. Pasar Malam KPMBP, Pameran, Karnival).
                   </p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRegistrationMode('admin');
+                    if (status === 'Upcoming') {
+                      setStatus('Registration Open');
+                    }
+                  }}
+                  className={`p-3.5 rounded-xl border text-left transition-all ${
+                    registrationMode === 'admin'
+                      ? 'bg-indigo-50 border-indigo-400 ring-2 ring-indigo-500/20 text-indigo-950 shadow-2xs'
+                      : 'bg-white border-slate-200 hover:border-slate-300 text-slate-700'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-extrabold text-xs">Pendaftaran Dalaman</span>
+                    {registrationMode === 'admin' && <Check className="w-4 h-4 text-indigo-600 shrink-0" />}
+                  </div>
+                  <p className="text-[10px] text-slate-500 mt-1 leading-snug">
+                    Daftar di portal & hantar slip ke WhatsApp urusetia/admin.
+                  </p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRegistrationMode('google_form');
+                    if (status === 'Upcoming') {
+                      setStatus('Registration Open');
+                    }
+                  }}
+                  className={`p-3.5 rounded-xl border text-left transition-all ${
+                    registrationMode === 'google_form'
+                      ? 'bg-indigo-50 border-indigo-400 ring-2 ring-indigo-500/20 text-indigo-950 shadow-2xs'
+                      : 'bg-white border-slate-200 hover:border-slate-300 text-slate-700'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-extrabold text-xs">Google Form</span>
+                    {registrationMode === 'google_form' && <Check className="w-4 h-4 text-indigo-600 shrink-0" />}
+                  </div>
+                  <p className="text-[10px] text-slate-500 mt-1 leading-snug">
+                    Pautan terus ke borang pendaftaran Google Form luar.
+                  </p>
+                </button>
+              </div>
+
+              {/* Conditional Form Fields */}
+              {registrationMode === 'none' && (
+                <div className="bg-emerald-50/70 border border-emerald-200/80 rounded-xl p-3.5 text-xs text-emerald-900 flex items-start gap-2.5">
+                  <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-extrabold block">Acara Terbuka / Tanpa Pendaftaran</span>
+                    <span className="text-[11px] text-emerald-800">
+                      Pengunjung dan pelajar boleh terus hadir tanpa sebarang borang pendaftaran, WhatsApp ringkasan atau tarikh tutup pendaftaran.
+                    </span>
+                  </div>
                 </div>
-              ) : (
-                <div className="bg-indigo-50/70 border border-indigo-200 rounded-xl p-3">
-                  <label className="block text-xs font-bold text-indigo-950 mb-1">
-                    Pautan Google Form Pendaftaran *
-                  </label>
-                  <input
-                    type="url"
-                    required
-                    value={registrationUrl}
-                    onChange={(e) => setRegistrationUrl(e.target.value)}
-                    placeholder="https://forms.gle/xxxxxxxxxxxx"
-                    className="w-full bg-white border border-indigo-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                  />
-                  <p className="text-[10px] text-indigo-800 mt-1">
-                    Peserta yang menekan butang "Daftar" akan terus dibawa ke Google Form ini tanpa borang dalaman.
-                  </p>
+              )}
+
+              {registrationMode === 'admin' && (
+                <div className="space-y-3 pt-1">
+                  <div className="bg-indigo-50/70 border border-indigo-200 rounded-xl p-3.5">
+                    <label className="block text-xs font-bold text-indigo-950 mb-1">
+                      No. WhatsApp Penganjur (Untuk Terima Ringkasan Peserta) *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={organiserWhatsApp}
+                      onChange={(e) => setOrganiserWhatsApp(e.target.value)}
+                      placeholder="Contoh: 0123456789 / 60123456789"
+                      className="w-full bg-white border border-indigo-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                    />
+                    <p className="text-[10px] text-indigo-800 mt-1">
+                      Peserta akan mengisi borang dalaman dan secara automatik menjana butang WhatsApp untuk menghantar ringkasan pendaftaran terus kepada nombor ini.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Tarikh & Masa Tutup Pendaftaran (Pilihan)
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={registrationDeadline}
+                      onChange={(e) => setRegistrationDeadline(e.target.value)}
+                      className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {registrationMode === 'google_form' && (
+                <div className="space-y-3 pt-1">
+                  <div className="bg-indigo-50/70 border border-indigo-200 rounded-xl p-3.5">
+                    <label className="block text-xs font-bold text-indigo-950 mb-1">
+                      Pautan Google Form Pendaftaran *
+                    </label>
+                    <input
+                      type="url"
+                      required
+                      value={registrationUrl}
+                      onChange={(e) => setRegistrationUrl(e.target.value)}
+                      placeholder="https://forms.gle/xxxxxxxxxxxx"
+                      className="w-full bg-white border border-indigo-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                    />
+                    <p className="text-[10px] text-indigo-800 mt-1">
+                      Peserta yang menekan butang "Daftar" akan terus dibawa ke Google Form ini tanpa borang dalaman.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Tarikh & Masa Tutup Pendaftaran (Pilihan)
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={registrationDeadline}
+                      onChange={(e) => setRegistrationDeadline(e.target.value)}
+                      className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                    />
+                  </div>
                 </div>
               )}
             </div>
-
-            {eventMode === 'physical' && (
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Tarikh & Masa Tutup Pendaftaran (Pilihan)</label>
-                <input
-                  type="datetime-local"
-                  value={registrationDeadline}
-                  onChange={(e) => setRegistrationDeadline(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                />
-              </div>
-            )}
 
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
@@ -645,105 +794,239 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
         </form>
       )}
 
-      {/* Events Table / List */}
-      <div className="bg-white/60 backdrop-blur-xl border border-white/80 rounded-3xl p-6 shadow-sm overflow-x-auto">
-        <h3 className="text-sm font-extrabold text-slate-800 mb-4">
-          Senarai Acara Terbit ({events.length})
-        </h3>
+      {/* Tab 1: Events Table / List */}
+      {activeAdminTab === 'events' && (
+        <div className="bg-white/60 backdrop-blur-xl border border-white/80 rounded-3xl p-6 shadow-sm overflow-x-auto">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+            <h3 className="text-sm font-extrabold text-slate-800">
+              Senarai Acara Terbit ({events.length})
+            </h3>
+          </div>
 
-        <table className="w-full text-left text-xs border-collapse">
-          <thead>
-            <tr className="border-b border-slate-200/80 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
-              <th className="pb-3 pr-2">Tajuk Event</th>
-              <th className="pb-3 px-2">Mod / Tarikh</th>
-              <th className="pb-3 px-2">Kategori</th>
-              <th className="pb-3 px-2">Pendaftaran</th>
-              <th className="pb-3 px-2">Status</th>
-              <th className="pb-3 px-2">Lokasi / Due</th>
-              <th className="pb-3 pl-2 text-right">Tindakan</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100 font-medium">
-            {events.map((evt) => (
-              <tr key={evt.id} className="hover:bg-slate-50/80 transition-colors">
-                <td className="py-3 pr-2 font-bold text-slate-900 max-w-[220px]">
-                  <div className="flex items-center gap-2">
-                    {evt.image ? (
-                      <img
-                        src={evt.image}
-                        alt="Poster"
-                        className="w-8 h-8 object-cover rounded-lg border border-slate-200 shrink-0 bg-slate-100"
-                        onError={(e) => {
-                          (e.target as HTMLElement).style.display = 'none';
-                        }}
-                      />
-                    ) : (
-                      <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-400 flex items-center justify-center shrink-0">
-                        <ImageIcon className="w-4 h-4" />
-                      </div>
-                    )}
-                    <span className="truncate">{evt.title}</span>
-                  </div>
-                </td>
-                <td className="py-3 px-2 text-slate-600 whitespace-nowrap">
-                  <div className="flex items-center gap-1.5">
-                    <span className={`px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase ${
-                      evt.eventMode === 'online' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700'
-                    }`}>
-                      {evt.eventMode === 'online' ? 'Online' : 'Fizikal'}
-                    </span>
-                    <span className="text-[11px] font-semibold">{evt.date}</span>
-                  </div>
-                </td>
-                <td className="py-3 px-2">
-                  <span className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded text-[10px] font-bold">
-                    {evt.category}
-                  </span>
-                </td>
-                <td className="py-3 px-2">
-                  {evt.registrationMode === 'admin' ? (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded text-[10px] font-bold">
-                      <span>WhatsApp Admin</span>
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded text-[10px] font-bold">
-                      <span>Google Form</span>
-                    </span>
-                  )}
-                </td>
-                <td className="py-3 px-2">
-                  <span className="px-2 py-0.5 bg-slate-100 text-slate-800 rounded text-[10px] font-bold">
-                    {evt.status}
-                  </span>
-                </td>
-                <td className="py-3 px-2 text-slate-600 max-w-[140px] truncate text-[11px]">
-                  {evt.eventMode === 'online' ? (
-                    <span className="text-amber-700 font-bold">Due: {evt.submissionDeadline ? evt.submissionDeadline.replace('T', ' ') : 'Atas Talian'}</span>
-                  ) : (
-                    evt.location || '-'
-                  )}
-                </td>
-                <td className="py-3 pl-2 text-right whitespace-nowrap space-x-1">
-                  <button
-                    onClick={() => handleStartEdit(evt)}
-                    className="p-1.5 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors"
-                    title="Sunting"
-                  >
-                    <Edit2 className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    onClick={() => onDeleteEvent(evt.id)}
-                    className="p-1.5 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors"
-                    title="Padam"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </td>
+          <table className="w-full text-left text-xs border-collapse">
+            <thead>
+              <tr className="border-b border-slate-200/80 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
+                <th className="pb-3 pr-2">Tajuk Event</th>
+                <th className="pb-3 px-2">Mod / Tarikh</th>
+                <th className="pb-3 px-2">Kategori</th>
+                <th className="pb-3 px-2">Pendaftaran</th>
+                <th className="pb-3 px-2">Status</th>
+                <th className="pb-3 px-2">Lokasi / Due</th>
+                <th className="pb-3 pl-2 text-right">Tindakan</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody className="divide-y divide-slate-100 font-medium">
+              {events.map((evt) => (
+                <tr key={evt.id} className="hover:bg-slate-50/80 transition-colors">
+                  <td className="py-3 pr-2 font-bold text-slate-900 max-w-[220px]">
+                    <div className="flex items-center gap-2">
+                      {evt.image ? (
+                        <img
+                          src={evt.image}
+                          alt="Poster"
+                          className="w-8 h-8 object-cover rounded-lg border border-slate-200 shrink-0 bg-slate-100"
+                          onError={(e) => {
+                            (e.target as HTMLElement).style.display = 'none';
+                          }}
+                        />
+                      ) : (
+                        <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-400 flex items-center justify-center shrink-0">
+                          <ImageIcon className="w-4 h-4" />
+                        </div>
+                      )}
+                      <span className="truncate">{evt.title}</span>
+                    </div>
+                  </td>
+                  <td className="py-3 px-2 text-slate-600 whitespace-nowrap">
+                    <div className="flex items-center gap-1.5">
+                      <span className={`px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase ${
+                        evt.eventMode === 'online' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700'
+                      }`}>
+                        {evt.eventMode === 'online' ? 'Online' : 'Fizikal'}
+                      </span>
+                      <span className="text-[11px] font-semibold">{evt.date}</span>
+                    </div>
+                  </td>
+                  <td className="py-3 px-2">
+                    <span className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded text-[10px] font-bold">
+                      {evt.category}
+                    </span>
+                  </td>
+                  <td className="py-3 px-2">
+                    {evt.registrationMode === 'none' ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-100 text-slate-700 border border-slate-200 rounded text-[10px] font-bold">
+                        <span>Tiada Pendaftaran</span>
+                      </span>
+                    ) : evt.registrationMode === 'admin' ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded text-[10px] font-bold">
+                        <span>WhatsApp Admin</span>
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded text-[10px] font-bold">
+                        <span>Google Form</span>
+                      </span>
+                    )}
+                  </td>
+                  <td className="py-3 px-2">
+                    <span className="px-2 py-0.5 bg-slate-100 text-slate-800 rounded text-[10px] font-bold">
+                      {evt.status}
+                    </span>
+                  </td>
+                  <td className="py-3 px-2 text-slate-600 max-w-[140px] truncate text-[11px]">
+                    {evt.eventMode === 'online' ? (
+                      <span className="text-amber-700 font-bold">Due: {evt.submissionDeadline ? evt.submissionDeadline.replace('T', ' ') : 'Atas Talian'}</span>
+                    ) : (
+                      evt.location || '-'
+                    )}
+                  </td>
+                  <td className="py-3 pl-2 text-right whitespace-nowrap space-x-1">
+                    <button
+                      onClick={() => handleStartEdit(evt)}
+                      className="p-1.5 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors"
+                      title="Sunting"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => onDeleteEvent(evt.id)}
+                      className="p-1.5 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors"
+                      title="Padam"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Tab 2: Registrations Table (From Firestore Cloud) */}
+      {activeAdminTab === 'registrations' && (
+        <div className="bg-white/60 backdrop-blur-xl border border-white/80 rounded-3xl p-6 shadow-sm space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
+                <Users className="w-4 h-4 text-emerald-600" />
+                <span>Rekod Pendaftaran Pelajar (Disimpan di Firebase)</span>
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Semua pendaftaran yang dihantar oleh pelajar direkodkan terus secara masa nyata.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Cari nama, no. ID, email..."
+                  value={regSearchQuery}
+                  onChange={(e) => setRegSearchQuery(e.target.value)}
+                  className="bg-white border border-slate-200 rounded-xl pl-8 pr-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                />
+              </div>
+
+              <select
+                value={selectedRegEventId}
+                onChange={(e) => setSelectedRegEventId(e.target.value)}
+                className="bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+              >
+                <option value="all">Semua Acara ({registrations.length})</option>
+                {events.map((evt) => (
+                  <option key={evt.id} value={evt.id}>
+                    {evt.title.length > 30 ? `${evt.title.slice(0, 30)}...` : evt.title}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {registrations.length === 0 ? (
+            <div className="text-center py-12 bg-slate-50/60 rounded-2xl border border-dashed border-slate-200">
+              <Users className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+              <p className="text-xs font-bold text-slate-600">Belum ada rekod pendaftaran dalam talian.</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                Pendaftaran pelajar yang dihantar melalui butang "Daftar" akan dipaparkan di sini secara automatik.
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-200/80 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
+                    <th className="pb-3 pr-2">Kod Pas / ID</th>
+                    <th className="pb-3 px-2">Nama Pelajar</th>
+                    <th className="pb-3 px-2">No. ID / Matrik</th>
+                    <th className="pb-3 px-2">Program</th>
+                    <th className="pb-3 px-2">WhatsApp / Email</th>
+                    <th className="pb-3 px-2">Acara</th>
+                    <th className="pb-3 pl-2 text-right">Tarikh Masa</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 font-medium">
+                  {registrations
+                    .filter((r) => {
+                      if (selectedRegEventId !== 'all' && r.eventId !== selectedRegEventId) return false;
+                      if (regSearchQuery.trim()) {
+                        const q = regSearchQuery.toLowerCase();
+                        return (
+                          r.studentName?.toLowerCase().includes(q) ||
+                          r.studentId?.toLowerCase().includes(q) ||
+                          r.email?.toLowerCase().includes(q) ||
+                          r.phone?.toLowerCase().includes(q) ||
+                          r.programCode?.toLowerCase().includes(q)
+                        );
+                      }
+                      return true;
+                    })
+                    .map((reg) => (
+                      <tr key={reg.id} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="py-3 pr-2 font-mono font-bold text-indigo-600">
+                          {reg.id}
+                        </td>
+                        <td className="py-3 px-2 font-bold text-slate-900">
+                          {reg.studentName}
+                        </td>
+                        <td className="py-3 px-2 font-mono text-slate-700 font-semibold">
+                          {reg.studentId}
+                        </td>
+                        <td className="py-3 px-2">
+                          <span className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded text-[10px] font-bold">
+                            {reg.programCode}
+                          </span>
+                        </td>
+                        <td className="py-3 px-2 text-slate-600">
+                          <div className="space-y-0.5">
+                            {reg.phone && (
+                              <a
+                                href={`https://wa.me/${reg.phone.replace(/[^0-9]/g, '')}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-emerald-700 font-bold hover:underline flex items-center gap-1"
+                              >
+                                <Phone className="w-3 h-3 text-emerald-600" />
+                                <span>{reg.phone}</span>
+                              </a>
+                            )}
+                            <div className="text-[10px] text-slate-400">{reg.email}</div>
+                          </div>
+                        </td>
+                        <td className="py-3 px-2 text-slate-800 font-semibold max-w-[180px] truncate">
+                          {reg.eventTitle || reg.eventId}
+                        </td>
+                        <td className="py-3 pl-2 text-right text-slate-500 text-[11px] whitespace-nowrap">
+                          {reg.timestamp || '-'}
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
 
     </div>
   );

@@ -1,0 +1,16 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Events collection: publicly readable, writable for admin event management
+    match /events/{eventId} {
+      allow read: if true;
+      allow create, update, delete: if true;
+    }
+    
+    // Registrations collection: allow students to register and urusetia to view records
+    match /registrations/{registrationId} {
+      allow read, write: if true;
+    }
+  }
+}

@@ -1,0 +1,63 @@
+{
+  "entities": {
+    "events": {
+      "title": "Events",
+      "description": "KPMBP College events, competitions, workshops and activities",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "description": "Title of the event" },
+        "description": { "type": "string", "description": "Full description of the event" },
+        "category": { "type": "string", "description": "Category (Akademik, Sukan, Kebudayaan, Kepimpinan, Keusahawanan, Pertandingan, Kerjaya)" },
+        "date": { "type": "string", "description": "Event date (YYYY-MM-DD)" },
+        "startTime": { "type": "string", "description": "Start time string" },
+        "endTime": { "type": "string", "description": "End time string" },
+        "location": { "type": "string", "description": "Physical campus location" },
+        "organiser": { "type": "string", "description": "Organiser name / club" },
+        "image": { "type": "string", "description": "Event banner / poster image URL" },
+        "eventMode": { "type": "string", "description": "physical or online" },
+        "registrationMode": { "type": "string", "description": "admin or google_form" },
+        "organiserWhatsApp": { "type": "string", "description": "Organiser WhatsApp number for admin registrations" },
+        "submissionDeadline": { "type": "string", "description": "Submission deadline for online events" },
+        "registrationUrl": { "type": "string", "description": "Google form link" },
+        "registrationDeadline": { "type": "string", "description": "Deadline for registration" },
+        "status": { "type": "string", "description": "Registration Open, Registration Closing Soon, Registration Closed, Fully Booked, Ongoing, Completed, Cancelled, Archived" },
+        "eligibility": { "type": "string", "description": "Eligibility conditions" },
+        "contact": { "type": "string", "description": "Person in charge contact info" },
+        "featured": { "type": "boolean", "description": "Whether event is highlighted" },
+        "importantNotice": { "type": "string", "description": "Urgent alert or important notice" },
+        "seatsLeft": { "type": "number", "description": "Number of remaining seats" },
+        "totalSeats": { "type": "number", "description": "Total seat capacity" },
+        "tags": { "type": "array", "items": { "type": "string" }, "description": "Search tags" },
+        "createdAt": { "type": "string", "description": "Creation ISO timestamp" },
+        "updatedAt": { "type": "string", "description": "Update ISO timestamp" }
+      },
+      "required": ["title", "description", "category", "date", "organiser", "status"]
+    },
+    "registrations": {
+      "title": "Registrations",
+      "description": "Student event registration records",
+      "type": "object",
+      "properties": {
+        "eventId": { "type": "string", "description": "ID of the event registered for" },
+        "eventTitle": { "type": "string", "description": "Title of the event" },
+        "studentName": { "type": "string", "description": "Full name of student" },
+        "studentId": { "type": "string", "description": "Student ID / Matrix number" },
+        "email": { "type": "string", "description": "Student email address" },
+        "phone": { "type": "string", "description": "WhatsApp contact number" },
+        "programCode": { "type": "string", "description": "Academic program code" },
+        "timestamp": { "type": "string", "description": "Registration timestamp" }
+      },
+      "required": ["eventId", "studentName", "studentId", "email", "phone", "programCode"]
+    }
+  },
+  "firestore": {
+    "/events/{eventId}": {
+      "schema": "events",
+      "description": "Public events collection"
+    },
+    "/registrations/{registrationId}": {
+      "schema": "registrations",
+      "description": "Event registrations submitted by students"
+    }
+  }
+}

@@ -69,7 +69,8 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
   };
 
   const isRegistrationAvailable =
-    liveStatus === 'Registration Open' || liveStatus === 'Registration Closing Soon';
+    event.registrationMode !== 'none' &&
+    (liveStatus === 'Registration Open' || liveStatus === 'Registration Closing Soon');
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-200 overflow-y-auto">
@@ -195,7 +196,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
           </div>
 
           {/* Registration Deadline Warning Banner */}
-          {deadlineRemaining && (
+          {event.registrationMode !== 'none' && deadlineRemaining && (
             <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 text-xs text-rose-900 flex items-start gap-3">
               <ShieldAlert className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
               <div>
@@ -247,8 +248,12 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
             <div className="bg-white/60 border border-slate-100 p-4 rounded-2xl space-y-2 text-xs">
               <div className="flex items-start gap-2">
                 <span className="font-bold text-slate-800 min-w-[140px]">Kaedah Pendaftaran:</span>
-                <span className="text-indigo-700 font-bold">
-                  {event.registrationMode === 'admin' ? 'WhatsApp Admin / Urusetia' : 'Google Form Rasmi'}
+                <span className={event.registrationMode === 'none' ? 'text-emerald-700 font-bold' : 'text-indigo-700 font-bold'}>
+                  {event.registrationMode === 'none'
+                    ? 'Tiada Pendaftaran (Acara Terbuka / Walk-in)'
+                    : event.registrationMode === 'admin'
+                    ? 'Pendaftaran Dalaman (WhatsApp Urusetia)'
+                    : 'Google Form Rasmi'}
                 </span>
               </div>
               <div className="flex items-start gap-2">
@@ -337,7 +342,17 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
             Tutup
           </button>
 
-          {isRegistrationAvailable ? (
+          {event.registrationMode === 'none' ? (
+            <a
+              href={getGoogleCalendarUrl(event)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1 bg-slate-900 hover:bg-slate-800 text-white py-2.5 px-5 rounded-xl text-xs sm:text-sm font-extrabold shadow-md transition-all flex items-center justify-center gap-2"
+            >
+              <CalendarPlus className="w-4 h-4 text-emerald-400" />
+              <span>Simpan ke Google Calendar (Acara Terbuka)</span>
+            </a>
+          ) : isRegistrationAvailable ? (
             event.registrationMode === 'google_form' && event.registrationUrl ? (
               <a
                 href={event.registrationUrl}

@@ -46,6 +46,7 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
     const newRecord: RegistrationRecord = {
       id: `REG-${Math.floor(100000 + Math.random() * 900000)}`,
       eventId: event.id,
+      eventTitle: event.title,
       studentName,
       studentId: studentId.toUpperCase(),
       email,

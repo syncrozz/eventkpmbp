@@ -2,6 +2,26 @@ import { KpmbpEvent } from '../types';
 
 export const INITIAL_EVENTS: KpmbpEvent[] = [
   {
+    id: 'kpmbp-evt-pasarmalam',
+    title: 'Pasar MALAM KPMBP',
+    description: 'Jualan makanan lazat, minuman segar, kraf tangan kreatif dan aktiviti keusahawanan siswa & siswi KPMBP. Terbuka kepada semua warga kampus dan pengunjung.',
+    category: 'Program Pelajar',
+    date: '2026-09-02',
+    startTime: '03:00 PM',
+    endTime: '10:00 PM',
+    location: 'Dataran Keusahawanan KPMBP',
+    organiser: 'PSN - Program Siswa Niaga KPMBP',
+    image: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=800&q=80',
+    eventMode: 'physical',
+    registrationMode: 'none',
+    status: 'Upcoming',
+    eligibility: 'Terbuka kepada semua warga kampus & orang awam',
+    contact: 'Penyelaras PSN - 014-5566778',
+    featured: true,
+    importantNotice: 'Jualan dan gerai dibuka bermula jam 3:00 petang sehingga 10:00 malam.',
+    tags: ['PasarMalam', 'Makanan', 'Keusahawanan', 'PSN', 'Santai']
+  },
+  {
     id: 'kpmbp-evt-001',
     title: 'Pertandingan Teater KPMBP 2026',
     description: 'Pertandingan drama dan teater antara kelab & persatuan KPMBP sempena Minggu Kebudayaan Siswa. Menampilkan 8 pasukan sengit membuat persembahan skrip kreatif tempatan.',
@@ -148,6 +168,7 @@ export const INITIAL_EVENTS: KpmbpEvent[] = [
     location: 'Dewan Besar KPMBP',
     organiser: 'Unit Perhubungan Industri & Alumni (UPIA)',
     image: 'https://images.unsplash.com/photo-1524178232363-1fb2b075b655?auto=format&fit=crop&w=800&q=80',
+    registrationMode: 'none',
     status: 'Upcoming',
     eligibility: 'WAJIB untuk Semua Pelajar Semester 5 KPMBP',
     contact: 'Penyelaras LI - upia.kpmbp@mara.gov.my',

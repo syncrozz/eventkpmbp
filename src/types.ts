@@ -24,7 +24,7 @@ export type EventStatus =
 
 export type EventMode = 'physical' | 'online';
 
-export type RegistrationMode = 'admin' | 'google_form';
+export type RegistrationMode = 'none' | 'admin' | 'google_form';
 
 export interface KpmbpEvent {
   id: string;
@@ -58,6 +58,7 @@ export interface KpmbpEvent {
 export interface RegistrationRecord {
   id: string;
   eventId: string;
+  eventTitle?: string;
   studentName: string;
   studentId: string;
   email: string;

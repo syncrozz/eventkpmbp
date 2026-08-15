@@ -28,6 +28,36 @@ export const EventCard: React.FC<EventCardProps> = ({
 
   // Distinct Status Badges
   const getStatusBadge = (status: string) => {
+    if (event.registrationMode === 'none') {
+      switch (status) {
+        case 'Ongoing':
+          return (
+            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-700 border border-emerald-300/80">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              SEDANG BERLANGSUNG
+            </span>
+          );
+        case 'Completed':
+          return (
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-200/80 text-slate-600">
+              SELESAI
+            </span>
+          );
+        case 'Archived':
+          return (
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-200 text-slate-500">
+              DIARKIBKAN
+            </span>
+          );
+        default:
+          return (
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200">
+              TERBUKA / AKAN DATANG
+            </span>
+          );
+      }
+    }
+
     switch (status) {
       case 'Registration Open':
         return (
@@ -83,7 +113,8 @@ export const EventCard: React.FC<EventCardProps> = ({
   };
 
   const isRegistrationAvailable =
-    liveStatus === 'Registration Open' || liveStatus === 'Registration Closing Soon';
+    event.registrationMode !== 'none' &&
+    (liveStatus === 'Registration Open' || liveStatus === 'Registration Closing Soon');
 
   return (
     <div className="group bg-white/60 backdrop-blur-xl border border-white/80 rounded-2xl p-4 sm:p-5 shadow-2xs hover:shadow-md transition-all duration-200 flex flex-col justify-between h-full relative overflow-hidden hover:border-indigo-300 hover:-translate-y-0.5">
@@ -213,42 +244,54 @@ export const EventCard: React.FC<EventCardProps> = ({
         )}
       </div>
 
-      {/* Action Buttons with Standardized Vocabulary */}
+      {/* Action Buttons */}
       <div className="mt-3 pt-3 border-t border-slate-100 flex gap-2">
-        <button
-          onClick={() => onViewDetails(event)}
-          className="flex-1 bg-white/80 hover:bg-white border border-slate-200 py-2 px-3 rounded-xl text-xs font-semibold text-slate-700 transition-all hover:border-slate-300 shadow-2xs active:scale-95"
-        >
-          Lihat Detail
-        </button>
-
-        {isRegistrationAvailable ? (
-          event.registrationMode === 'google_form' && event.registrationUrl ? (
-            <a
-              href={event.registrationUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-3 rounded-xl text-xs font-bold shadow-sm shadow-indigo-200 transition-all flex items-center justify-center gap-1 active:scale-95"
-            >
-              <span>Google Form</span>
-              <ExternalLink className="w-3.5 h-3.5" />
-            </a>
-          ) : (
-            <button
-              onClick={() => onRegister(event)}
-              className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-3 rounded-xl text-xs font-bold shadow-sm shadow-indigo-200 transition-all flex items-center justify-center gap-1 active:scale-95"
-            >
-              <span>Daftar</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-          )
-        ) : (
+        {event.registrationMode === 'none' ? (
           <button
-            disabled
-            className="px-3 bg-slate-100 text-slate-400 border border-slate-200 py-2 rounded-xl text-[11px] font-bold cursor-not-allowed"
+            onClick={() => onViewDetails(event)}
+            className="w-full bg-slate-900 hover:bg-slate-800 text-white py-2 px-3 rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 active:scale-95"
           >
-            {liveStatus === 'Archived' ? 'Diarkibkan' : 'Tutup'}
+            <span>Lihat Info Acara</span>
+            <ArrowRight className="w-3.5 h-3.5" />
           </button>
+        ) : (
+          <>
+            <button
+              onClick={() => onViewDetails(event)}
+              className="flex-1 bg-white/80 hover:bg-white border border-slate-200 py-2 px-3 rounded-xl text-xs font-semibold text-slate-700 transition-all hover:border-slate-300 shadow-2xs active:scale-95"
+            >
+              Lihat Detail
+            </button>
+
+            {isRegistrationAvailable ? (
+              event.registrationMode === 'google_form' && event.registrationUrl ? (
+                <a
+                  href={event.registrationUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-3 rounded-xl text-xs font-bold shadow-sm shadow-indigo-200 transition-all flex items-center justify-center gap-1 active:scale-95"
+                >
+                  <span>Google Form</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+              ) : (
+                <button
+                  onClick={() => onRegister(event)}
+                  className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-3 rounded-xl text-xs font-bold shadow-sm shadow-indigo-200 transition-all flex items-center justify-center gap-1 active:scale-95"
+                >
+                  <span>Daftar</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              )
+            ) : (
+              <button
+                disabled
+                className="px-3 bg-slate-100 text-slate-400 border border-slate-200 py-2 rounded-xl text-[11px] font-bold cursor-not-allowed"
+              >
+                {liveStatus === 'Archived' ? 'Diarkibkan' : 'Tutup'}
+              </button>
+            )}
+          </>
         )}
       </div>
 

@@ -110,7 +110,18 @@ export function getDynamicEventStatus(event: KpmbpEvent, nowTimestamp = Date.now
   const startTime = getEventStartTimestamp(event);
   const endTime = getEventEndTimestamp(event);
 
-  // Online Event Status Logic
+  // If No Registration Required (e.g. Pasar Malam, Pameran, Taklimat Terbuka)
+  if (event.registrationMode === 'none') {
+    if (nowTimestamp >= endTime) {
+      return 'Completed';
+    }
+    if (nowTimestamp >= startTime && nowTimestamp < endTime) {
+      return 'Ongoing';
+    }
+    return 'Upcoming';
+  }
+
+  // Online Event Status Logic (with registration)
   if (event.eventMode === 'online') {
     if (nowTimestamp >= endTime) {
       return 'Completed';
@@ -125,10 +136,13 @@ export function getDynamicEventStatus(event: KpmbpEvent, nowTimestamp = Date.now
         return 'Registration Closing Soon';
       }
     }
+    if (startTime && nowTimestamp >= startTime && nowTimestamp < endTime) {
+      return 'Ongoing';
+    }
     return 'Registration Open';
   }
 
-  // Physical Event Status Logic
+  // Physical Event Status Logic (with registration)
   if (nowTimestamp >= endTime) {
     return 'Completed';
   }

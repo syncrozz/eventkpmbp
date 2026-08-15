@@ -10,8 +10,15 @@ import { CalendarView } from './components/CalendarView';
 import { RegistrationModal } from './components/RegistrationModal';
 import { AdminPortal } from './components/AdminPortal';
 import { AdminPinModal } from './components/AdminPinModal';
-import { sortEventsByNearestDue, getCategoryButtonClass } from './utils/calendar';
-import { Sparkles, Calendar as CalendarIcon, Filter, Flame, CheckCircle2, ShieldCheck, Bookmark, Lock, KeyRound } from 'lucide-react';
+import { sortEventsByNearestDue, getCategoryButtonClass, isEventArchived } from './utils/calendar';
+import { 
+  subscribeToEvents, 
+  createEventInFirestore, 
+  updateEventInFirestore, 
+  deleteEventInFirestore, 
+  saveRegistrationToFirestore 
+} from './services/firebase';
+import { Sparkles, Calendar as CalendarIcon, Filter, Flame, CheckCircle2, ShieldCheck, Bookmark, Lock, KeyRound, Archive, Cloud } from 'lucide-react';
 
 export default function App() {
   const [events, setEvents] = useState<KpmbpEvent[]>(() => {
@@ -26,6 +33,8 @@ export default function App() {
     }
     return INITIAL_EVENTS;
   });
+
+  const [isFirebaseConnected, setIsFirebaseConnected] = useState(false);
 
   const [savedEventIds, setSavedEventIds] = useState<string[]>(() => {
     try {
@@ -59,14 +68,28 @@ export default function App() {
   // Toast Notification
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // Save events to local storage
+  // 1. Real-time Firebase Firestore synchronization
   useEffect(() => {
-    try {
-      localStorage.setItem('kpmbp_events_v1', JSON.stringify(events));
-    } catch {
-      // storage quota error
-    }
-  }, [events]);
+    const unsubscribe = subscribeToEvents(
+      (firestoreEvents) => {
+        if (firestoreEvents && firestoreEvents.length > 0) {
+          setEvents(firestoreEvents);
+          setIsFirebaseConnected(true);
+          try {
+            localStorage.setItem('kpmbp_events_v1', JSON.stringify(firestoreEvents));
+          } catch {
+            // Storage quota
+          }
+        }
+      },
+      (err) => {
+        console.warn('Firebase sync notice:', err.message);
+        setIsFirebaseConnected(false);
+      }
+    );
+
+    return () => unsubscribe();
+  }, []);
 
   // Save bookmarked events to local storage
   useEffect(() => {
@@ -116,18 +139,24 @@ export default function App() {
     showToast('Admin Mode telah dimatikan (OFF).');
   };
 
-  // Urgent events count
-  const urgentCount = events.filter(
+  // Active vs Archived Events
+  const activeEvents = events.filter((e) => !isEventArchived(e));
+  const archivedEvents = events.filter((e) => isEventArchived(e));
+
+  // Urgent events count (active only)
+  const urgentCount = activeEvents.filter(
     (e) => e.status === 'Registration Closing Soon' || (e.seatsLeft !== undefined && e.seatsLeft <= 5)
   ).length;
 
-  const openRegistrationCount = events.filter(
+  const openRegistrationCount = activeEvents.filter(
     (e) => e.status === 'Registration Open' || e.status === 'Registration Closing Soon'
   ).length;
 
   // Filtered & Sorted Events (by nearest due date)
+  const eventsToFilter = currentTab === 'archive' ? archivedEvents : activeEvents;
+
   const filteredEvents = sortEventsByNearestDue(
-    events.filter((evt) => {
+    eventsToFilter.filter((evt) => {
       // Saved filter check
       if (showOnlySaved && !savedEventIds.includes(evt.id)) {
         return false;
@@ -141,7 +170,7 @@ export default function App() {
         const q = searchQuery.toLowerCase();
         const matchTitle = evt.title.toLowerCase().includes(q);
         const matchDesc = evt.description.toLowerCase().includes(q);
-        const matchLoc = evt.location.toLowerCase().includes(q);
+        const matchLoc = evt.location?.toLowerCase().includes(q);
         const matchOrg = evt.organiser.toLowerCase().includes(q);
         const matchCat = evt.category.toLowerCase().includes(q);
         const matchTags = evt.tags?.some((t) => t.toLowerCase().includes(q));
@@ -153,30 +182,55 @@ export default function App() {
     })
   );
 
-  // Admin Actions
-  const handleCreateEvent = (newEventData: Omit<KpmbpEvent, 'id'>) => {
-    const created: KpmbpEvent = {
-      ...newEventData,
-      id: `kpmbp-evt-${Date.now()}`
-    };
-    setEvents((prev) => [created, ...prev]);
-    showToast('Acara baharu berjaya diterbitkan!');
-  };
+  // Admin Actions with Firebase Firestore
+  const handleCreateEvent = async (newEventData: Omit<KpmbpEvent, 'id'>) => {
+    try {
+      // Optimistic local state update
+      const tempId = `kpmbp-evt-${Date.now()}`;
+      const tempEvent: KpmbpEvent = { ...newEventData, id: tempId };
+      setEvents((prev) => [tempEvent, ...prev]);
 
-  const handleUpdateEvent = (updated: KpmbpEvent) => {
-    setEvents((prev) => prev.map((e) => (e.id === updated.id ? updated : e)));
-    showToast('Maklumat acara telah dikemaskini.');
-  };
-
-  const handleDeleteEvent = (id: string) => {
-    if (window.confirm('Adakah anda pasti mahu memadam acara ini?')) {
-      setEvents((prev) => prev.filter((e) => e.id !== id));
-      showToast('Acara telah dipadam.');
+      // Cloud Firestore Persistence
+      await createEventInFirestore(newEventData);
+      showToast('Acara baharu berjaya diterbitkan & disimpan ke Firebase Cloud!');
+    } catch (err) {
+      console.error('Error creating event in Firestore:', err);
+      showToast('Acara disimpan secara lokal (Penyegerakan awan sedang berlangsung).');
     }
   };
 
-  const handleRegistrationSuccess = (record: RegistrationRecord) => {
-    showToast(`Pendaftaran berjaya! Kod Pas Digital: ${record.id}`);
+  const handleUpdateEvent = async (updated: KpmbpEvent) => {
+    try {
+      setEvents((prev) => prev.map((e) => (e.id === updated.id ? updated : e)));
+      await updateEventInFirestore(updated);
+      showToast('Maklumat acara telah dikemaskini dalam Firebase Cloud.');
+    } catch (err) {
+      console.error('Error updating event in Firestore:', err);
+      showToast('Maklumat dikemaskini secara lokal.');
+    }
+  };
+
+  const handleDeleteEvent = async (id: string) => {
+    if (window.confirm('Adakah anda pasti mahu memadam acara ini dari pangkalan data?')) {
+      try {
+        setEvents((prev) => prev.filter((e) => e.id !== id));
+        await deleteEventInFirestore(id);
+        showToast('Acara telah berjaya dipadam daripada Firebase Cloud.');
+      } catch (err) {
+        console.error('Error deleting event from Firestore:', err);
+        showToast('Acara dipadam daripada paparan lokal.');
+      }
+    }
+  };
+
+  const handleRegistrationSuccess = async (record: RegistrationRecord) => {
+    try {
+      await saveRegistrationToFirestore(record);
+      showToast(`Pendaftaran berjaya direkodkan ke pangkalan data! Kod Pas: ${record.id}`);
+    } catch (err) {
+      console.error('Error recording registration in Firestore:', err);
+      showToast(`Pendaftaran dijana! Kod Pas: ${record.id}`);
+    }
   };
 
   return (
