@@ -26,8 +26,8 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
 
           <div className="my-2">
             <img
-              src="https://raw.githubusercontent.com/syncrozz/syncrozz-assets/main/Pages%20Banner/KPMBP.Hype.png"
-              alt="KPMBP Apa yang tengah Hype"
+              src="https://raw.githubusercontent.com/syncrozz/syncrozz-assets/main/OGI/OGI.Event.v3.jpg"
+              alt="Event KPMBP"
               className="w-full max-w-sm sm:max-w-md h-auto rounded-xl shadow-xs border border-white/80 object-contain"
               loading="eager"
             />

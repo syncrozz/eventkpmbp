@@ -60,14 +60,9 @@ export const Navbar: React.FC<NavbarProps> = ({
             alt="Event KPMBP Logo" 
             className="w-9 h-9 object-contain rounded-xl shadow-md shadow-indigo-200/50 group-hover:scale-105 transition-transform"
           />
-          <div>
-            <div className="flex items-center gap-1 font-black text-base tracking-tight">
-              <span className="text-indigo-600">EVENT</span>
-              <span className="text-slate-900">KPMBP</span>
-            </div>
-            <span className="text-[10px] font-semibold text-slate-400 block -mt-0.5 tracking-tight">
-              syncrozz.com
-            </span>
+          <div className="flex items-center gap-1 font-black text-base tracking-tight leading-none">
+            <span className="text-indigo-600">EVENT</span>
+            <span className="text-slate-900">KPMBP</span>
           </div>
         </div>
 

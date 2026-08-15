@@ -12,10 +12,15 @@ import {
   getEventShareText
 } from '../utils/calendar';
 import { 
+  updateDocumentOpenGraph,
+  downloadEventOGImage,
+  DEFAULT_OGI_SOURCE_URL
+} from '../utils/ogi';
+import { 
   X, Calendar, Clock, MapPin, User, ShieldAlert, 
   Share2, ExternalLink, Award, PhoneCall, Check, 
   CalendarPlus, MessageCircle, Copy, Globe, Send,
-  FileText
+  FileText, Download, Image as ImageIcon, Loader2, AlertCircle
 } from 'lucide-react';
 
 interface EventDetailModalProps {
@@ -30,6 +35,17 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
   onRegister
 }) => {
   const [copied, setCopied] = useState(false);
+  const [isGeneratingOgi, setIsGeneratingOgi] = useState(false);
+  const [ogiError, setOgiError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (event) {
+      updateDocumentOpenGraph(event);
+    }
+    return () => {
+      updateDocumentOpenGraph(null);
+    };
+  }, [event]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -68,6 +84,19 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
     const text = encodeURIComponent(getEventShareText(event));
     const url = encodeURIComponent(window.location.href.split('#')[0]);
     window.open(`https://t.me/share/url?url=${url}&text=${text}`, '_blank');
+  };
+
+  const handleDownloadOGI = async () => {
+    try {
+      setIsGeneratingOgi(true);
+      setOgiError(null);
+      await downloadEventOGImage(event);
+    } catch (err: any) {
+      console.error('OGI Generation failed:', err);
+      setOgiError(err?.message || 'Ralat: Sumber imej OGI tidak dapat diakses.');
+    } finally {
+      setIsGeneratingOgi(false);
+    }
   };
 
   const isRegistrationAvailable =
@@ -335,7 +364,28 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                 {copied ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4 text-slate-600" />}
                 <span>{copied ? 'Maklumat Disalin!' : 'Salin Maklumat'}</span>
               </button>
+
+              <button
+                onClick={handleDownloadOGI}
+                disabled={isGeneratingOgi}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-bold transition-colors shadow-2xs disabled:opacity-60"
+                title="Jana & Muat Turun Kad Open Graph Image (OGI) berasaskan template rasmi"
+              >
+                {isGeneratingOgi ? (
+                  <Loader2 className="w-4 h-4 animate-spin text-indigo-600" />
+                ) : (
+                  <Download className="w-4 h-4 text-indigo-600" />
+                )}
+                <span>{isGeneratingOgi ? 'Menjana Kad OGI...' : 'Muat Turun Kad OGI'}</span>
+              </button>
             </div>
+
+            {ogiError && (
+              <div className="mt-2.5 p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-xs flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                <span>{ogiError}</span>
+              </div>
+            )}
           </div>
 
         </div>
