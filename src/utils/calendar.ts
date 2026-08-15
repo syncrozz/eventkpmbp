@@ -199,11 +199,74 @@ export function buildRegistrationWhatsAppUrl(params: {
   return `https://wa.me/${number}?text=${encodeURIComponent(text)}`;
 }
 
-export function formatDateMalay(dateStr: string): { day: string; month: string; year: string; full: string } {
+export function formatDateDMY(dateStr?: string): string {
+  if (!dateStr) return '';
+  try {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+      const [y, m, d] = dateStr.split('-');
+      return `${d}-${m}-${y}`;
+    }
+    const d = new Date(dateStr);
+    if (!isNaN(d.getTime())) {
+      const day = String(d.getDate()).padStart(2, '0');
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const year = d.getFullYear();
+      return `${day}-${month}-${year}`;
+    }
+  } catch {
+    // fallback
+  }
+  return dateStr;
+}
+
+export function formatDeadlineMalay(deadlineStr?: string): string {
+  if (!deadlineStr) return 'Sebelum 11:59 PM';
+  try {
+    if (deadlineStr.includes('T')) {
+      const [datePart, timePart] = deadlineStr.split('T');
+      const [y, m, d] = datePart.split('-');
+      if (y && m && d) {
+        const dmy = `${d.padStart(2, '0')}-${m.padStart(2, '0')}-${y}`;
+        let timeFormatted = timePart;
+        const [hh, mm] = timePart.split(':');
+        if (hh && mm) {
+          let h = parseInt(hh, 10);
+          const ampm = h >= 12 ? 'PM' : 'AM';
+          h = h % 12 || 12;
+          timeFormatted = `${String(h).padStart(2, '0')}:${mm} ${ampm}`;
+        }
+        return `${dmy}   ${timeFormatted}`;
+      }
+    }
+
+    if (/^\d{4}-\d{2}-\d{2}$/.test(deadlineStr)) {
+      const [y, m, d] = deadlineStr.split('-');
+      return `${d}-${m}-${y}`;
+    }
+
+    const d = new Date(deadlineStr);
+    if (!isNaN(d.getTime())) {
+      const day = String(d.getDate()).padStart(2, '0');
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const year = d.getFullYear();
+      let hours = d.getHours();
+      const minutes = String(d.getMinutes()).padStart(2, '0');
+      const ampm = hours >= 12 ? 'PM' : 'AM';
+      hours = hours % 12 || 12;
+      const timeStr = `${String(hours).padStart(2, '0')}:${minutes} ${ampm}`;
+      return `${day}-${month}-${year}   ${timeStr}`;
+    }
+  } catch {
+    // fallback
+  }
+  return deadlineStr;
+}
+
+export function formatDateMalay(dateStr: string): { day: string; month: string; year: string; full: string; dmy: string } {
   try {
     const d = new Date(dateStr);
     if (isNaN(d.getTime())) {
-      return { day: '--', month: '---', year: '----', full: dateStr };
+      return { day: '--', month: '---', year: '----', full: dateStr, dmy: dateStr };
     }
     const monthsMalay = [
       'JAN', 'FEB', 'MAC', 'APR', 'MEI', 'JUN',
@@ -223,10 +286,11 @@ export function formatDateMalay(dateStr: string): { day: string; month: string; 
       day: dayNum,
       month: monthShort,
       year: year,
-      full: `${dayNum} ${monthFull} ${year}`
+      full: `${dayNum} ${monthFull} ${year}`,
+      dmy: `${dayNum}-${monthShort}-${year}`
     };
   } catch {
-    return { day: '01', month: 'OGOS', year: '2026', full: dateStr };
+    return { day: '01', month: 'OGOS', year: '2026', full: dateStr, dmy: dateStr };
   }
 }
 

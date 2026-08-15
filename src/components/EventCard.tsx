@@ -1,6 +1,6 @@
 import React from 'react';
 import { KpmbpEvent } from '../types';
-import { formatDateMalay, getTimeRemainingMalay, getCategoryBadgeClass, getDynamicEventStatus } from '../utils/calendar';
+import { formatDateMalay, formatDeadlineMalay, getTimeRemainingMalay, getCategoryBadgeClass, getDynamicEventStatus } from '../utils/calendar';
 import { Clock, MapPin, User, ArrowRight, Flame, AlertTriangle, Bookmark, Globe, ExternalLink } from 'lucide-react';
 
 interface EventCardProps {
@@ -213,7 +213,7 @@ export const EventCard: React.FC<EventCardProps> = ({
             <div className="flex items-center gap-2 text-amber-900 bg-amber-50/70 px-2 py-1 rounded-lg border border-amber-200/60">
               <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
               <span className="font-bold text-[11px]">
-                Due Submission: {event.submissionDeadline ? event.submissionDeadline.replace('T', ' ') : 'Sebelum 11:59 PM'}
+                Due Submission: {formatDeadlineMalay(event.submissionDeadline)}
               </span>
             </div>
           ) : (
@@ -271,7 +271,7 @@ export const EventCard: React.FC<EventCardProps> = ({
                   rel="noopener noreferrer"
                   className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-3 rounded-xl text-xs font-bold shadow-sm shadow-indigo-200 transition-all flex items-center justify-center gap-1 active:scale-95"
                 >
-                  <span>Google Form</span>
+                  <span>Borang Daftar</span>
                   <ExternalLink className="w-3.5 h-3.5" />
                 </a>
               ) : (

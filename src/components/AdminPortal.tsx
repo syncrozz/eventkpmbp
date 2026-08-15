@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { KpmbpEvent, EventCategory, EventStatus, RegistrationRecord, RegistrationMode } from '../types';
 import { subscribeToRegistrations } from '../services/firebase';
+import { formatDateDMY, formatDeadlineMalay } from '../utils/calendar';
 import { 
   Plus, Trash2, Edit2, ShieldCheck, Check, Sparkles, AlertCircle, 
   Image as ImageIcon, Upload, Link as LinkIcon, X, Eye, Cloud, Users, 
@@ -544,11 +545,11 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="font-extrabold text-xs">Google Form</span>
+                    <span className="font-extrabold text-xs">Borang Daftar Luar</span>
                     {registrationMode === 'google_form' && <Check className="w-4 h-4 text-indigo-600 shrink-0" />}
                   </div>
                   <p className="text-[10px] text-slate-500 mt-1 leading-snug">
-                    Pautan terus ke borang pendaftaran Google Form luar.
+                    Pautan borang pendaftaran luar (Google Form, Microsoft Forms, dll).
                   </p>
                 </button>
               </div>
@@ -619,18 +620,18 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                 <div className="space-y-3 pt-1">
                   <div className="bg-indigo-50/70 border border-indigo-200 rounded-xl p-3.5">
                     <label className="block text-xs font-bold text-indigo-950 mb-1">
-                      Pautan Google Form Pendaftaran *
+                      Pautan Borang Pendaftaran (Google Form / Microsoft Forms / dll) *
                     </label>
                     <input
                       type="url"
                       required
                       value={registrationUrl}
                       onChange={(e) => setRegistrationUrl(e.target.value)}
-                      placeholder="https://forms.gle/xxxxxxxxxxxx"
+                      placeholder="https://forms.gle/... atau https://forms.office.com/..."
                       className="w-full bg-white border border-indigo-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
                     />
                     <p className="text-[10px] text-indigo-800 mt-1">
-                      Peserta yang menekan butang "Daftar" akan terus dibawa ke Google Form ini tanpa borang dalaman.
+                      Peserta yang menekan butang "Borang Daftar" akan terus dibawa ke pautan borang ini.
                     </p>
                   </div>
 
@@ -921,7 +922,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                       }`}>
                         {evt.eventMode === 'online' ? 'Online' : 'Fizikal'}
                       </span>
-                      <span className="text-[11px] font-semibold">{evt.date}</span>
+                      <span className="text-[11px] font-semibold">{formatDateDMY(evt.date)}</span>
                     </div>
                   </td>
                   <td className="py-3 px-2">
@@ -949,9 +950,9 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                       {evt.status}
                     </span>
                   </td>
-                  <td className="py-3 px-2 text-slate-600 max-w-[140px] truncate text-[11px]">
+                  <td className="py-3 px-2 text-slate-600 max-w-[170px] truncate text-[11px]">
                     {evt.eventMode === 'online' ? (
-                      <span className="text-amber-700 font-bold">Due: {evt.submissionDeadline ? evt.submissionDeadline.replace('T', ' ') : 'Atas Talian'}</span>
+                      <span className="text-amber-700 font-bold">Due: {formatDeadlineMalay(evt.submissionDeadline)}</span>
                     ) : (
                       evt.location || '-'
                     )}

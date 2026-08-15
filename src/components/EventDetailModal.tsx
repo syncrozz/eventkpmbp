@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { KpmbpEvent } from '../types';
-import { formatDateMalay, getGoogleCalendarUrl, downloadIcsFile, getTimeRemainingMalay, getCategoryBadgeClass, getDynamicEventStatus } from '../utils/calendar';
+import { formatDateMalay, formatDeadlineMalay, formatDateDMY, getGoogleCalendarUrl, downloadIcsFile, getTimeRemainingMalay, getCategoryBadgeClass, getDynamicEventStatus } from '../utils/calendar';
 import { 
   X, Calendar, Clock, MapPin, User, ShieldAlert, 
   Share2, ExternalLink, Award, PhoneCall, Check, 
@@ -52,7 +52,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
     const text = encodeURIComponent(
       `🎭 *${event.title}*\n\n` +
       `📅 *Tarikh:* ${fullDateMalay}\n` +
-      (isOnline ? `🌐 *Mod:* Online (Penyerahan: ${event.submissionDeadline ? event.submissionDeadline.replace('T', ' ') : 'Sebelum 11:59 PM'})\n` : `🕒 *Masa:* ${event.startTime} - ${event.endTime || ''}\n📍 *Lokasi:* ${event.location || 'KPMBP'}\n`) +
+      (isOnline ? `🌐 *Mod:* Online (Penyerahan: ${formatDeadlineMalay(event.submissionDeadline)})\n` : `🕒 *Masa:* ${event.startTime} - ${event.endTime || ''}\n📍 *Lokasi:* ${event.location || 'KPMBP'}\n`) +
       `👤 *Anjuran:* ${event.organiser}\n\n` +
       `Sertai dan ketahui maklumat lanjut di KPMBP Event Hub:\n` +
       `${window.location.href.split('#')[0]}#event-${event.id}`
@@ -153,8 +153,8 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                 </div>
                 <div>
                   <div className="text-[10px] text-amber-700 font-bold uppercase">Due Submission</div>
-                  <div className="font-bold text-amber-900">
-                    {event.submissionDeadline ? event.submissionDeadline.replace('T', ' ') : 'Sebelum 11:59 PM'}
+                  <div className="font-bold text-amber-900 tracking-wide">
+                    {formatDeadlineMalay(event.submissionDeadline)}
                   </div>
                 </div>
               </div>
@@ -205,8 +205,8 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                 </div>
                 <div className="font-bold text-sm mt-0.5">{deadlineRemaining}</div>
                 {(event.submissionDeadline || event.registrationDeadline) && (
-                  <div className="text-slate-500 text-[11px] mt-0.5">
-                    Tarikh tutup: {new Date(event.submissionDeadline || event.registrationDeadline!).toLocaleString('ms-MY')}
+                  <div className="text-slate-600 text-[11px] font-medium mt-0.5">
+                    Tarikh tutup: <span className="font-bold text-slate-800">{formatDeadlineMalay(event.submissionDeadline || event.registrationDeadline)}</span>
                   </div>
                 )}
               </div>
@@ -360,7 +360,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                 rel="noopener noreferrer"
                 className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 px-5 rounded-xl text-xs sm:text-sm font-extrabold shadow-lg shadow-indigo-200 transition-all flex items-center justify-center gap-2"
               >
-                <span>Buka Google Form Rasmi</span>
+                <span>Borang Daftar</span>
                 <ExternalLink className="w-4 h-4" />
               </a>
             ) : (
