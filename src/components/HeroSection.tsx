@@ -30,6 +30,8 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               alt="Event KPMBP"
               className="w-full max-w-sm sm:max-w-md h-auto rounded-xl shadow-xs border border-white/80 object-contain"
               loading="eager"
+              referrerPolicy="no-referrer"
+              crossOrigin="anonymous"
             />
           </div>
 
