@@ -20,22 +20,10 @@ import firebaseConfig from '../../firebase-applet-config.json';
 // Initialize Firebase App
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
-// Determine specific firestore database ID from applet config
-const targetDatabaseId = firebaseConfig.firestoreDatabaseId && firebaseConfig.firestoreDatabaseId !== '(default)'
-  ? firebaseConfig.firestoreDatabaseId
-  : undefined;
-
-// Initialize Firestore with ignoreUndefinedProperties to prevent Firebase errors on undefined fields
-let dbInstance;
-try {
-  dbInstance = initializeFirestore(app, {
-    ignoreUndefinedProperties: true,
-  }, targetDatabaseId);
-} catch {
-  dbInstance = targetDatabaseId ? getFirestore(app, targetDatabaseId) : getFirestore(app);
-}
-
-export const db = dbInstance;
+// Direct instance creation for specific firestore database ID from applet config
+export const db = firebaseConfig.firestoreDatabaseId && firebaseConfig.firestoreDatabaseId !== '(default)'
+  ? getFirestore(app, firebaseConfig.firestoreDatabaseId)
+  : getFirestore(app);
 
 const EVENTS_COLLECTION = 'events';
 const REGISTRATIONS_COLLECTION = 'registrations';

@@ -197,7 +197,7 @@ export default function App() {
         try { localStorage.setItem('kpmbp_events_v1', JSON.stringify(next)); } catch {}
         return next;
       });
-      showToast('Acara disimpan ke peranti.');
+      showToast(`Peringatan: Gagal sync Firebase (${err?.message || 'Ralat sambungan'}). Disimpan sementara di peranti.`);
     }
   };
 
@@ -212,7 +212,7 @@ export default function App() {
         try { localStorage.setItem('kpmbp_events_v1', JSON.stringify(next)); } catch {}
         return next;
       });
-      showToast('Maklumat dikemaskini secara lokal.');
+      showToast(`Peringatan: Gagal sync Firebase. Maklumat dikemaskini sementara di peranti.`);
     }
   };
 
@@ -228,7 +228,7 @@ export default function App() {
           try { localStorage.setItem('kpmbp_events_v1', JSON.stringify(next)); } catch {}
           return next;
         });
-        showToast('Acara dipadam daripada paparan lokal.');
+        showToast('Acara dipadam daripada paparan peranti.');
       }
     }
   };
