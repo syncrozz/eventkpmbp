@@ -533,29 +533,16 @@ export function getCalendarEventPillClass(category: string): string {
 }
 
 /**
- * Returns pastel style classes for category badges in cards/modals.
+ * Returns striking pastel yellow style classes for category badges across cards, modals, and tables.
  */
-export function getCategoryBadgeClass(category: string): string {
-  switch (category) {
-    case 'Pertandingan':
-      return 'bg-orange-100/80 text-orange-900 border-orange-200/90';
-    case 'Program Pelajar':
-      return 'bg-pink-100/80 text-pink-900 border-pink-200/90';
-    case 'Sukan':
-      return 'bg-cyan-100/80 text-cyan-900 border-cyan-200/90';
-    case 'Kebudayaan':
-      return 'bg-sky-100/80 text-sky-900 border-sky-200/90';
-    case 'Akademik':
-      return 'bg-amber-100/80 text-amber-900 border-amber-200/90';
-    case 'Bengkel':
-      return 'bg-purple-100/80 text-purple-900 border-purple-200/90';
-    case 'Kelab & Persatuan':
-      return 'bg-teal-100/80 text-teal-900 border-teal-200/90';
-    case 'Kerjaya':
-      return 'bg-indigo-100/80 text-indigo-900 border-indigo-200/90';
-    case 'Institusi':
-      return 'bg-violet-100/80 text-violet-900 border-violet-200/90';
-    default:
-      return 'bg-slate-100 text-slate-800 border-slate-200';
-  }
+export function getCategoryBadgeClass(_category?: string): string {
+  // Radiant Pastel Yellow theme: high visibility, warm contrast, crisp dark amber text
+  return 'bg-amber-100/95 text-amber-950 border border-amber-300/90 shadow-2xs font-extrabold';
+}
+
+/**
+ * Returns striking Pastel Yellow badge styling for Date displays (e.g. 20 Ogos, date badges, date boxes).
+ */
+export function getDateBadgeClass(): string {
+  return 'bg-amber-100/95 text-amber-950 border border-amber-300 shadow-2xs font-black';
 }

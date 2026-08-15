@@ -198,12 +198,14 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
           {/* Quick Info Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-50/80 border border-slate-200/80 rounded-2xl p-4 text-xs">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0">
-                <Calendar className="w-4 h-4" />
+              <div className="w-8 h-8 rounded-xl bg-amber-100 border border-amber-300 text-amber-900 flex items-center justify-center shrink-0 shadow-2xs">
+                <Calendar className="w-4 h-4 text-amber-800" />
               </div>
               <div>
-                <div className="text-[10px] text-slate-400 font-bold uppercase">Tarikh</div>
-                <div className="font-bold text-slate-800">{fullDateMalay}</div>
+                <div className="text-[10px] text-slate-400 font-bold uppercase">Tarikh Acara</div>
+                <div className="font-extrabold text-amber-950 bg-amber-100/90 border border-amber-300/80 px-2 py-0.5 rounded-lg inline-block text-xs mt-0.5">
+                  {fullDateMalay}
+                </div>
               </div>
             </div>
 

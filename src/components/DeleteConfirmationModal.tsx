@@ -65,8 +65,10 @@ export const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = (
             <h4 className="font-extrabold text-xs text-slate-900 truncate">
               {event.title}
             </h4>
-            <div className="flex items-center gap-2 text-[11px] text-slate-500 mt-0.5">
-              <span>{formatDateDMY(event.date)}</span>
+            <div className="flex items-center gap-2 text-[11px] text-slate-500 mt-1">
+              <span className="px-2 py-0.5 rounded-lg bg-amber-100/95 text-amber-950 border border-amber-300 font-extrabold text-[10px] shadow-2xs">
+                {formatDateDMY(event.date)}
+              </span>
               <span>•</span>
               <span className="truncate">{event.organiser}</span>
             </div>

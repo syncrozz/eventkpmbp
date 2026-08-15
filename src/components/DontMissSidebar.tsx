@@ -96,7 +96,7 @@ export const DontMissSidebar: React.FC<DontMissSidebarProps> = ({
                     <span className={`text-[9px] font-black uppercase tracking-wider border px-2 py-0.5 rounded-md ${urgency.color}`}>
                       {urgency.label}
                     </span>
-                    <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+                    <span className="text-[10px] font-black text-amber-950 bg-amber-100/95 border border-amber-300 px-2 py-0.5 rounded-lg shadow-2xs">
                       {day} {month}
                     </span>
                   </div>

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { KpmbpEvent, EventCategory, EventStatus, RegistrationRecord, RegistrationMode } from '../types';
 import { subscribeToRegistrations } from '../services/firebase';
-import { formatDateDMY, formatDeadlineMalay } from '../utils/calendar';
+import { formatDateDMY, formatDeadlineMalay, getCategoryBadgeClass } from '../utils/calendar';
 import { optimizeEventImage } from '../utils/imageOptimizer';
 import { 
   Plus, Trash2, Edit2, ShieldCheck, Check, Sparkles, AlertCircle, 
@@ -955,11 +955,13 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                       }`}>
                         {evt.eventMode === 'online' ? 'Online' : 'Fizikal'}
                       </span>
-                      <span className="text-[11px] font-semibold">{formatDateDMY(evt.date)}</span>
+                      <span className="text-[11px] font-extrabold px-2 py-0.5 rounded-lg bg-amber-100/95 text-amber-950 border border-amber-300 shadow-2xs">
+                        {formatDateDMY(evt.date)}
+                      </span>
                     </div>
                   </td>
                   <td className="py-3 px-2">
-                    <span className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded text-[10px] font-bold">
+                    <span className={`px-2 py-0.5 rounded-lg text-[10px] font-extrabold uppercase tracking-wider ${getCategoryBadgeClass(evt.category)}`}>
                       {evt.category}
                     </span>
                   </td>

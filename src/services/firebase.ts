@@ -65,20 +65,51 @@ export function sanitizeForFirestore(obj: any): any {
   return clean;
 }
 
-// Test connection on boot
-export async function testConnection(): Promise<boolean> {
+// Helper to load stored events cache
+export function getLocalEventsCache(): KpmbpEvent[] {
+  if (typeof window === 'undefined') return INITIAL_EVENTS;
   try {
-    await getDocFromServer(doc(db, 'test', 'connection'));
-    return true;
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.warn('Firestore notice: client appears offline.');
-      return false;
+    const raw = localStorage.getItem('kpmbp_events_v1');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
     }
-    return true;
-  }
+  } catch {}
+  return INITIAL_EVENTS;
 }
-testConnection();
+
+// Helper to save stored events cache
+export function saveLocalEventsCache(events: KpmbpEvent[]): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem('kpmbp_events_v1', JSON.stringify(events));
+  } catch {}
+}
+
+// Helper to load stored registrations cache
+export function getLocalRegistrationsCache(): RegistrationRecord[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem('kpmbp_registrations_v1');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        return parsed;
+      }
+    }
+  } catch {}
+  return [];
+}
+
+// Helper to save stored registrations cache
+export function saveLocalRegistrationsCache(registrations: RegistrationRecord[]): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem('kpmbp_registrations_v1', JSON.stringify(registrations));
+  } catch {}
+}
 
 /**
  * Seeds initial event data into Firestore if collection is empty or when manually requested.
@@ -86,12 +117,10 @@ testConnection();
 export async function seedEventsIfEmpty(force = false): Promise<void> {
   try {
     const eventsRef = collection(db, EVENTS_COLLECTION);
-    const snapshot = await getDocs(eventsRef);
     
-    if (snapshot.empty || force) {
-      console.log('Seeding initial KPMBP events to Firestore...');
+    // Only attempt seed if not quota blocked or when user explicitly requested
+    if (force) {
       const batch = writeBatch(db);
-      
       for (const event of INITIAL_EVENTS) {
         const docRef = doc(db, EVENTS_COLLECTION, event.id);
         const payload = sanitizeForFirestore({
@@ -101,85 +130,107 @@ export async function seedEventsIfEmpty(force = false): Promise<void> {
         });
         batch.set(docRef, payload);
       }
-      
       await batch.commit();
-      try {
-        localStorage.setItem('kpmbp_has_seeded', 'true');
-      } catch {}
-      console.log('Seeding completed successfully into Firestore.');
     }
-  } catch (error) {
-    console.error('Error checking or seeding initial events in Firestore:', error);
+    saveLocalEventsCache(INITIAL_EVENTS);
+    try { localStorage.setItem('kpmbp_has_seeded', 'true'); } catch {}
+  } catch (error: any) {
+    console.warn('Notice: Firestore seeding skipped or quota reached, using local dataset.', error?.message);
+    saveLocalEventsCache(INITIAL_EVENTS);
   }
 }
 
 /**
- * Subscribes to real-time events updates in Firestore.
+ * Subscribes to real-time events updates in Firestore with automatic offline/quota fallback.
  */
 export function subscribeToEvents(
   onUpdate: (events: KpmbpEvent[]) => void,
   onError?: (err: Error) => void
 ) {
+  // 1. Immediately emit cached data so UI is fast and resilient
+  const cachedEvents = getLocalEventsCache();
+  if (cachedEvents.length > 0) {
+    onUpdate(cachedEvents);
+  }
+
   const eventsRef = collection(db, EVENTS_COLLECTION);
   
-  return onSnapshot(
-    eventsRef,
-    async (snapshot) => {
-      if (snapshot.empty) {
-        // If the database has never been initialized on this browser, run initial seed
-        const alreadySeeded = typeof window !== 'undefined' && localStorage.getItem('kpmbp_has_seeded') === 'true';
-        if (!alreadySeeded) {
-          try { localStorage.setItem('kpmbp_has_seeded', 'true'); } catch {}
-          await seedEventsIfEmpty();
-          onUpdate(INITIAL_EVENTS);
-          return;
-        } else {
-          // If the admin deliberately deleted events down to 0, reflect empty state
-          onUpdate([]);
-          return;
+  let unsubscribe: (() => void) | null = null;
+  try {
+    unsubscribe = onSnapshot(
+      eventsRef,
+      async (snapshot) => {
+        if (snapshot.empty) {
+          const alreadySeeded = typeof window !== 'undefined' && localStorage.getItem('kpmbp_has_seeded') === 'true';
+          if (!alreadySeeded) {
+            try { localStorage.setItem('kpmbp_has_seeded', 'true'); } catch {}
+            await seedEventsIfEmpty(true);
+            onUpdate(INITIAL_EVENTS);
+            return;
+          } else {
+            onUpdate([]);
+            saveLocalEventsCache([]);
+            return;
+          }
         }
-      }
 
-      const eventsList: KpmbpEvent[] = [];
-      snapshot.forEach((docSnap) => {
-        const data = docSnap.data();
-        eventsList.push({
-          id: docSnap.id,
-          title: data.title || '',
-          description: data.description || '',
-          category: data.category || 'Akademik',
-          date: data.date || '',
-          startTime: data.startTime || '',
-          endTime: data.endTime || '',
-          location: data.location || '',
-          organiser: data.organiser || 'KPMBP',
-          image: data.image || undefined,
-          eventMode: data.eventMode || 'physical',
-          registrationMode: data.registrationMode || (data.registrationUrl ? 'google_form' : (data.organiserWhatsApp ? 'admin' : 'none')),
-          organiserWhatsApp: data.organiserWhatsApp || undefined,
-          submissionDeadline: data.submissionDeadline || undefined,
-          registrationUrl: data.registrationUrl || undefined,
-          registrationDeadline: data.registrationDeadline || undefined,
-          status: data.status || 'Registration Open',
-          eligibility: data.eligibility || 'Terbuka kepada semua siswa & siswi KPMBP',
-          contact: data.contact || 'Urusetia KPMBP',
-          featured: data.featured || false,
-          importantNotice: data.importantNotice || undefined,
-          seatsLeft: typeof data.seatsLeft === 'number' ? data.seatsLeft : undefined,
-          totalSeats: typeof data.totalSeats === 'number' ? data.totalSeats : undefined,
-          tags: Array.isArray(data.tags) ? data.tags : []
+        const eventsList: KpmbpEvent[] = [];
+        snapshot.forEach((docSnap) => {
+          const data = docSnap.data();
+          eventsList.push({
+            id: docSnap.id,
+            title: data.title || '',
+            description: data.description || '',
+            category: data.category || 'Akademik',
+            date: data.date || '',
+            startTime: data.startTime || '',
+            endTime: data.endTime || '',
+            location: data.location || '',
+            organiser: data.organiser || 'KPMBP',
+            image: data.image || undefined,
+            eventMode: data.eventMode || 'physical',
+            registrationMode: data.registrationMode || (data.registrationUrl ? 'google_form' : (data.organiserWhatsApp ? 'admin' : 'none')),
+            organiserWhatsApp: data.organiserWhatsApp || undefined,
+            submissionDeadline: data.submissionDeadline || undefined,
+            registrationUrl: data.registrationUrl || undefined,
+            registrationDeadline: data.registrationDeadline || undefined,
+            status: data.status || 'Registration Open',
+            eligibility: data.eligibility || 'Terbuka kepada semua siswa & siswi KPMBP',
+            contact: data.contact || 'Urusetia KPMBP',
+            featured: data.featured || false,
+            importantNotice: data.importantNotice || undefined,
+            seatsLeft: typeof data.seatsLeft === 'number' ? data.seatsLeft : undefined,
+            totalSeats: typeof data.totalSeats === 'number' ? data.totalSeats : undefined,
+            tags: Array.isArray(data.tags) ? data.tags : []
+          });
         });
-      });
 
-      // Sort by date ascending
-      eventsList.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
-      onUpdate(eventsList);
-    },
-    (err) => {
-      console.error('Firestore onSnapshot error:', err);
-      if (onError) onError(err);
+        eventsList.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+        saveLocalEventsCache(eventsList);
+        onUpdate(eventsList);
+      },
+      (err) => {
+        // Quota exceeded or connection error handled gracefully
+        console.warn('Firestore sync notice (using local storage fallback):', err.message);
+        const fallback = getLocalEventsCache();
+        onUpdate(fallback);
+        if (onError) onError(err);
+      }
+    );
+  } catch (err: any) {
+    console.warn('Firestore subscription unavailable:', err?.message);
+    const fallback = getLocalEventsCache();
+    onUpdate(fallback);
+    if (onError) onError(err);
+  }
+
+  return () => {
+    if (unsubscribe) {
+      try {
+        unsubscribe();
+      } catch {}
     }
-  );
+  };
 }
 
 /**
@@ -238,9 +289,15 @@ export async function deleteEventInFirestore(eventId: string): Promise<void> {
 }
 
 /**
- * Saves a student registration record in Firestore.
+ * Saves a student registration record with local-first guarantee and Firestore sync.
  */
 export async function saveRegistrationToFirestore(record: RegistrationRecord): Promise<void> {
+  // 1. Immediately save to local registrations cache
+  const localList = getLocalRegistrationsCache();
+  const nextList = [record, ...localList.filter((r) => r.id !== record.id)];
+  saveLocalRegistrationsCache(nextList);
+
+  // 2. Attempt Firestore sync
   try {
     const regRef = collection(db, REGISTRATIONS_COLLECTION);
     const payload = sanitizeForFirestore({
@@ -248,37 +305,64 @@ export async function saveRegistrationToFirestore(record: RegistrationRecord): P
       createdAt: serverTimestamp()
     });
     await addDoc(regRef, payload);
-  } catch (error) {
-    console.error('Error saving registration to Firestore:', error);
-    throw error;
+  } catch (error: any) {
+    console.warn('Registration saved to local storage (Cloud sync notice):', error?.message);
+    // Don't throw if local was saved successfully
   }
 }
 
 /**
- * Subscribes to real-time registration records (for Admin Portal).
+ * Subscribes to real-time registration records (for Admin Portal) with offline/quota resilience.
  */
 export function subscribeToRegistrations(
   onUpdate: (registrations: RegistrationRecord[]) => void
 ) {
+  // 1. Emit local cached registrations immediately
+  const cached = getLocalRegistrationsCache();
+  if (cached.length > 0) {
+    onUpdate(cached);
+  }
+
   const regRef = collection(db, REGISTRATIONS_COLLECTION);
-  return onSnapshot(regRef, (snapshot) => {
-    const list: RegistrationRecord[] = [];
-    snapshot.forEach((docSnap) => {
-      const data = docSnap.data();
-      list.push({
-        id: docSnap.id,
-        eventId: data.eventId || '',
-        eventTitle: data.eventTitle || '',
-        studentName: data.studentName || '',
-        studentId: data.studentId || '',
-        email: data.email || '',
-        phone: data.phone || '',
-        programCode: data.programCode || '',
-        timestamp: data.timestamp || ''
-      });
-    });
-    onUpdate(list);
-  }, (err) => {
-    console.error('Error fetching registrations:', err);
-  });
+  let unsubscribe: (() => void) | null = null;
+  
+  try {
+    unsubscribe = onSnapshot(
+      regRef, 
+      (snapshot) => {
+        const list: RegistrationRecord[] = [];
+        snapshot.forEach((docSnap) => {
+          const data = docSnap.data();
+          list.push({
+            id: docSnap.id,
+            eventId: data.eventId || '',
+            eventTitle: data.eventTitle || '',
+            studentName: data.studentName || '',
+            studentId: data.studentId || '',
+            email: data.email || '',
+            phone: data.phone || '',
+            programCode: data.programCode || '',
+            timestamp: data.timestamp || ''
+          });
+        });
+        saveLocalRegistrationsCache(list);
+        onUpdate(list);
+      }, 
+      (err) => {
+        console.warn('Registrations sync notice (using local storage):', err.message);
+        onUpdate(getLocalRegistrationsCache());
+      }
+    );
+  } catch (err: any) {
+    console.warn('Registrations subscription unavailable:', err?.message);
+    onUpdate(getLocalRegistrationsCache());
+  }
+
+  return () => {
+    if (unsubscribe) {
+      try {
+        unsubscribe();
+      } catch {}
+    }
+  };
 }

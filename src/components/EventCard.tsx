@@ -209,10 +209,10 @@ export const EventCard: React.FC<EventCardProps> = ({
               </button>
             )}
 
-            {/* Date Box */}
-            <div className="text-center bg-white/80 backdrop-blur-sm border border-slate-200/80 px-2.5 py-1 rounded-xl shadow-2xs group-hover:border-indigo-200 group-hover:bg-indigo-50/50 transition-colors min-w-[42px]">
-              <div className="text-base font-black text-slate-900 leading-none">{day}</div>
-              <div className="text-[9px] font-bold text-slate-500 uppercase tracking-wider mt-0.5">{month}</div>
+            {/* Date Box with Pastel Yellow Highlight */}
+            <div className="text-center bg-amber-100/95 border border-amber-300 px-2.5 py-1 rounded-xl shadow-2xs group-hover:bg-amber-200/95 group-hover:border-amber-400 transition-all min-w-[44px]">
+              <div className="text-base font-black text-amber-950 leading-none">{day}</div>
+              <div className="text-[9px] font-black text-amber-800 uppercase tracking-wider mt-0.5">{month}</div>
             </div>
           </div>
         </div>

@@ -74,22 +74,17 @@ export default function App() {
   // Toast Notification
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // 1. Real-time Firebase Firestore synchronization
+  // 1. Real-time Firebase Firestore synchronization with offline/local-first resilience
   useEffect(() => {
     const unsubscribe = subscribeToEvents(
       (firestoreEvents) => {
-        if (Array.isArray(firestoreEvents)) {
+        if (Array.isArray(firestoreEvents) && firestoreEvents.length > 0) {
           setEvents(firestoreEvents);
           setIsFirebaseConnected(true);
-          try {
-            localStorage.setItem('kpmbp_events_v1', JSON.stringify(firestoreEvents));
-          } catch {
-            // Storage quota
-          }
         }
       },
       (err) => {
-        console.warn('Firebase sync notice:', err.message);
+        // Handled silently: falls back to local cache safely
         setIsFirebaseConnected(false);
       }
     );
@@ -205,29 +200,24 @@ export default function App() {
     })
   );
 
-  // Admin Actions with Firebase Firestore
+  // Admin Actions with Firebase Firestore & local fallback
   const handleCreateEvent = async (newEventData: Omit<KpmbpEvent, 'id'>) => {
+    let createdEvent: KpmbpEvent;
     try {
       const newId = await createEventInFirestore(newEventData);
-      const createdEvent: KpmbpEvent = { ...newEventData, id: newId };
-      setEvents((prev) => {
-        const next = [createdEvent, ...prev.filter((e) => e.id !== newId)];
-        try { localStorage.setItem('kpmbp_events_v1', JSON.stringify(next)); } catch {}
-        return next;
-      });
-      showToast(`Acara "${newEventData.title}" berjaya diterbitkan & disimpan ke Firebase Cloud!`);
+      createdEvent = { ...newEventData, id: newId };
     } catch (err: any) {
-      console.error('Error creating event in Firestore:', err);
-      // Fallback local storage
+      console.warn('Saving event locally (Cloud notice):', err?.message);
       const tempId = `kpmbp-evt-${Date.now()}`;
-      const tempEvent: KpmbpEvent = { ...newEventData, id: tempId };
-      setEvents((prev) => {
-        const next = [tempEvent, ...prev];
-        try { localStorage.setItem('kpmbp_events_v1', JSON.stringify(next)); } catch {}
-        return next;
-      });
-      showToast(`Peringatan: Gagal sync Firebase (${err?.message || 'Ralat sambungan'}). Disimpan dalam peranti.`);
+      createdEvent = { ...newEventData, id: tempId };
     }
+
+    setEvents((prev) => {
+      const next = [createdEvent, ...prev.filter((e) => e.id !== createdEvent.id)];
+      try { localStorage.setItem('kpmbp_events_v1', JSON.stringify(next)); } catch {}
+      return next;
+    });
+    showToast(`Acara "${newEventData.title}" berjaya diterbitkan & disimpan!`);
   };
 
   const handleUpdateEvent = async (updated: KpmbpEvent) => {
@@ -244,11 +234,10 @@ export default function App() {
 
     try {
       await updateEventInFirestore(updated);
-      showToast(`Maklumat "${updated.title}" telah berjaya dikemaskini & disimpan ke Firebase Cloud.`);
     } catch (err: any) {
-      console.error('Error updating event in Firestore:', err);
-      showToast(`Peringatan: Gagal sync Firebase (${err?.message || 'Ralat sambungan'}). Disimpan sementara di peranti.`);
+      console.warn('Notice: Update stored locally (Cloud notice):', err?.message);
     }
+    showToast(`Maklumat "${updated.title}" telah berjaya dikemaskini!`);
   };
 
   const handleRequestDelete = (target: KpmbpEvent | string) => {
@@ -263,28 +252,27 @@ export default function App() {
   const handleConfirmDelete = async () => {
     if (!eventToDelete) return;
     setIsDeletingEvent(true);
+    const targetTitle = eventToDelete.title;
+    const targetId = eventToDelete.id;
+
+    // 1. Immediately update state
+    setEvents((prev) => {
+      const next = prev.filter((e) => e.id !== targetId);
+      try { localStorage.setItem('kpmbp_events_v1', JSON.stringify(next)); } catch {}
+      return next;
+    });
+    if (selectedEventForDetail?.id === targetId) {
+      setSelectedEventForDetail(null);
+    }
+    setEventToDelete(null);
+
     try {
-      await deleteEventInFirestore(eventToDelete.id);
-      showToast(`Acara "${eventToDelete.title}" telah berjaya dipadam daripada Firebase Cloud.`);
-      setEvents((prev) => prev.filter((e) => e.id !== eventToDelete.id));
-      if (selectedEventForDetail?.id === eventToDelete.id) {
-        setSelectedEventForDetail(null);
-      }
-      setEventToDelete(null);
+      await deleteEventInFirestore(targetId);
     } catch (err: any) {
-      console.error('Error deleting event from Firestore:', err);
-      setEvents((prev) => {
-        const next = prev.filter((e) => e.id !== eventToDelete.id);
-        try { localStorage.setItem('kpmbp_events_v1', JSON.stringify(next)); } catch {}
-        return next;
-      });
-      showToast(`Acara dipadam daripada paparan peranti.`);
-      if (selectedEventForDetail?.id === eventToDelete.id) {
-        setSelectedEventForDetail(null);
-      }
-      setEventToDelete(null);
+      console.warn('Notice: Deleted from local storage (Cloud notice):', err?.message);
     } finally {
       setIsDeletingEvent(false);
+      showToast(`Acara "${targetTitle}" telah berjaya dipadam.`);
     }
   };
 

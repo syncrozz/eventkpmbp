@@ -97,13 +97,16 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
           <h3 className="text-xl font-extrabold leading-snug">
             {event.title}
           </h3>
-          <p className="text-xs text-indigo-100 mt-1">
+          <div className="flex flex-wrap items-center gap-2 text-xs mt-2">
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-amber-100 text-amber-950 border border-amber-300 font-extrabold shadow-2xs">
+              📅 {fullDateMalay}
+            </span>
             {event.eventMode === 'online' ? (
-              <span>📅 {fullDateMalay} • ⏰ Due: {event.submissionDeadline ? event.submissionDeadline.replace('T', ' ') : '23:59'}</span>
+              <span className="text-xs text-indigo-100">⏰ Due: {event.submissionDeadline ? event.submissionDeadline.replace('T', ' ') : '23:59'}</span>
             ) : (
-              <span>📅 {fullDateMalay} • 📍 {event.location || 'Kampus KPMBP'}</span>
+              <span className="text-xs text-indigo-100">📍 {event.location || 'Kampus KPMBP'}</span>
             )}
-          </p>
+          </div>
         </div>
 
         {/* Content Body */}
