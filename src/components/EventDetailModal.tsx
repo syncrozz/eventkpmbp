@@ -369,14 +369,14 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                 onClick={handleDownloadOGI}
                 disabled={isGeneratingOgi}
                 className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-bold transition-colors shadow-2xs disabled:opacity-60"
-                title="Jana & Muat Turun Kad Open Graph Image (OGI) berasaskan template rasmi"
+                title="Jana & Muat Turun Poster Acara berasaskan template rasmi"
               >
                 {isGeneratingOgi ? (
                   <Loader2 className="w-4 h-4 animate-spin text-indigo-600" />
                 ) : (
                   <Download className="w-4 h-4 text-indigo-600" />
                 )}
-                <span>{isGeneratingOgi ? 'Menjana Kad OGI...' : 'Muat Turun Kad OGI'}</span>
+                <span>{isGeneratingOgi ? 'Menjana Poster...' : 'Muat Turun Poster'}</span>
               </button>
             </div>
 
