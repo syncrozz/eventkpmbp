@@ -20,17 +20,29 @@ import firebaseConfig from '../../firebase-applet-config.json';
 // Initialize Firebase App
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
-// Direct instance creation for specific firestore database ID from applet config
-export const db = firebaseConfig.firestoreDatabaseId && firebaseConfig.firestoreDatabaseId !== '(default)'
-  ? getFirestore(app, firebaseConfig.firestoreDatabaseId)
-  : getFirestore(app);
+// Database ID configured in applet settings
+const designatedDbId = firebaseConfig.firestoreDatabaseId && firebaseConfig.firestoreDatabaseId !== '(default)'
+  ? firebaseConfig.firestoreDatabaseId
+  : undefined;
+
+// Initialize primary and fallback instances with ignoreUndefinedProperties
+let primaryDb;
+try {
+  primaryDb = initializeFirestore(app, {
+    ignoreUndefinedProperties: true,
+  }, designatedDbId);
+} catch {
+  primaryDb = designatedDbId ? getFirestore(app, designatedDbId) : getFirestore(app);
+}
+
+export const db = primaryDb;
 
 const EVENTS_COLLECTION = 'events';
 const REGISTRATIONS_COLLECTION = 'registrations';
 
 /**
  * Deeply sanitizes any object or array by removing `undefined` keys
- * to ensure 100% compatibility with Firestore document writes.
+ * and ensuring values are safe for Firestore write operations.
  */
 export function sanitizeForFirestore(obj: any): any {
   if (obj === undefined) {
@@ -63,7 +75,6 @@ export async function testConnection(): Promise<boolean> {
       console.warn('Firestore notice: client appears offline.');
       return false;
     }
-    // Expected if test/connection doesn't exist, but connection handshake succeeded
     return true;
   }
 }

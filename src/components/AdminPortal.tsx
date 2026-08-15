@@ -2,10 +2,11 @@ import React, { useState, useRef, useEffect } from 'react';
 import { KpmbpEvent, EventCategory, EventStatus, RegistrationRecord, RegistrationMode } from '../types';
 import { subscribeToRegistrations } from '../services/firebase';
 import { formatDateDMY, formatDeadlineMalay } from '../utils/calendar';
+import { optimizeEventImage } from '../utils/imageOptimizer';
 import { 
   Plus, Trash2, Edit2, ShieldCheck, Check, Sparkles, AlertCircle, 
   Image as ImageIcon, Upload, Link as LinkIcon, X, Eye, Cloud, Users, 
-  Search, Phone, Mail, Calendar, Download, RefreshCw
+  Search, Phone, Mail, Calendar, Download, RefreshCw, Loader2
 } from 'lucide-react';
 
 interface AdminPortalProps {
@@ -60,6 +61,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const [eligibility, setEligibility] = useState('Terbuka kepada semua warga KPMBP');
   const [contact, setContact] = useState('Urusetia KPMBP - 012-3456789');
 
+  const [isCompressingImage, setIsCompressingImage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const categories: Exclude<EventCategory, 'Semua'>[] = [
@@ -117,24 +119,21 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     setContact(evt.contact);
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Check size limit (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      alert('Saiz fail terlalu besar. Sila pilih gambar di bawah 5MB.');
-      return;
+    try {
+      setIsCompressingImage(true);
+      // Automatically scale and compress to lightweight base64 (<200KB) safe for Firestore
+      const optimizedBase64 = await optimizeEventImage(file, 1200, 1200, 0.82);
+      setImage(optimizedBase64);
+    } catch (err: any) {
+      console.error('Error optimizing image:', err);
+      alert(err?.message || 'Gagal memproses fail gambar.');
+    } finally {
+      setIsCompressingImage(false);
     }
-
-    const reader = new FileReader();
-    reader.onload = (loadEvent) => {
-      const result = loadEvent.target?.result as string;
-      if (result) {
-        setImage(result);
-      }
-    };
-    reader.readAsDataURL(file);
   };
 
   const handleRemoveImage = () => {
@@ -767,21 +766,28 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                     ref={fileInputRef}
                     accept="image/*"
                     onChange={handleFileUpload}
+                    disabled={isCompressingImage}
                     className="hidden"
                     id="poster-upload-input"
                   />
                   <label
                     htmlFor="poster-upload-input"
-                    className="border-2 border-dashed border-indigo-200 hover:border-indigo-400 bg-white/80 rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer transition-colors text-center group"
+                    className={`border-2 border-dashed border-indigo-200 hover:border-indigo-400 bg-white/80 rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer transition-colors text-center group ${
+                      isCompressingImage ? 'opacity-60 pointer-events-none' : ''
+                    }`}
                   >
                     <div className="w-10 h-10 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center group-hover:scale-110 transition-transform mb-2">
-                      <Upload className="w-5 h-5" />
+                      {isCompressingImage ? (
+                        <Loader2 className="w-5 h-5 animate-spin text-indigo-600" />
+                      ) : (
+                        <Upload className="w-5 h-5" />
+                      )}
                     </div>
                     <span className="text-xs font-bold text-indigo-600">
-                      Klik atau heret gambar poster di sini
+                      {isCompressingImage ? 'Mengoptimumkan & memampatkan imej poster...' : 'Klik atau heret gambar poster di sini'}
                     </span>
                     <span className="text-[10px] text-slate-400 mt-1">
-                      Format disokong: PNG, JPG, JPEG, WebP (Maksimum 5MB)
+                      Dimampatkan secara automatik untuk keserasian awan pantas (Format: JPG, PNG, WebP)
                     </span>
                   </label>
                 </div>
