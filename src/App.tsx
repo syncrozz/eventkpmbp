@@ -185,27 +185,33 @@ export default function App() {
   // Admin Actions with Firebase Firestore
   const handleCreateEvent = async (newEventData: Omit<KpmbpEvent, 'id'>) => {
     try {
-      // Optimistic local state update
-      const tempId = `kpmbp-evt-${Date.now()}`;
-      const tempEvent: KpmbpEvent = { ...newEventData, id: tempId };
-      setEvents((prev) => [tempEvent, ...prev]);
-
-      // Cloud Firestore Persistence
       await createEventInFirestore(newEventData);
       showToast('Acara baharu berjaya diterbitkan & disimpan ke Firebase Cloud!');
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error creating event in Firestore:', err);
-      showToast('Acara disimpan secara lokal (Penyegerakan awan sedang berlangsung).');
+      // Fallback local storage
+      const tempId = `kpmbp-evt-${Date.now()}`;
+      const tempEvent: KpmbpEvent = { ...newEventData, id: tempId };
+      setEvents((prev) => {
+        const next = [tempEvent, ...prev];
+        try { localStorage.setItem('kpmbp_events_v1', JSON.stringify(next)); } catch {}
+        return next;
+      });
+      showToast('Acara disimpan ke peranti.');
     }
   };
 
   const handleUpdateEvent = async (updated: KpmbpEvent) => {
     try {
-      setEvents((prev) => prev.map((e) => (e.id === updated.id ? updated : e)));
       await updateEventInFirestore(updated);
       showToast('Maklumat acara telah dikemaskini dalam Firebase Cloud.');
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error updating event in Firestore:', err);
+      setEvents((prev) => {
+        const next = prev.map((e) => (e.id === updated.id ? updated : e));
+        try { localStorage.setItem('kpmbp_events_v1', JSON.stringify(next)); } catch {}
+        return next;
+      });
       showToast('Maklumat dikemaskini secara lokal.');
     }
   };
@@ -213,11 +219,15 @@ export default function App() {
   const handleDeleteEvent = async (id: string) => {
     if (window.confirm('Adakah anda pasti mahu memadam acara ini dari pangkalan data?')) {
       try {
-        setEvents((prev) => prev.filter((e) => e.id !== id));
         await deleteEventInFirestore(id);
         showToast('Acara telah berjaya dipadam daripada Firebase Cloud.');
-      } catch (err) {
+      } catch (err: any) {
         console.error('Error deleting event from Firestore:', err);
+        setEvents((prev) => {
+          const next = prev.filter((e) => e.id !== id);
+          try { localStorage.setItem('kpmbp_events_v1', JSON.stringify(next)); } catch {}
+          return next;
+        });
         showToast('Acara dipadam daripada paparan lokal.');
       }
     }

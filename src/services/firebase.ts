@@ -1,6 +1,7 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { 
   getFirestore, 
+  initializeFirestore,
   collection, 
   doc, 
   setDoc, 
@@ -8,10 +9,9 @@ import {
   onSnapshot, 
   getDocs, 
   writeBatch,
-  query,
-  orderBy,
   addDoc,
-  serverTimestamp
+  serverTimestamp,
+  getDocFromServer
 } from 'firebase/firestore';
 import { KpmbpEvent, RegistrationRecord } from '../types';
 import { INITIAL_EVENTS } from '../data/initialEvents';
@@ -20,13 +20,66 @@ import firebaseConfig from '../../firebase-applet-config.json';
 // Initialize Firebase App
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
-// Initialize Firestore with specific database ID from config if present
-export const db = firebaseConfig.firestoreDatabaseId && firebaseConfig.firestoreDatabaseId !== '(default)'
-  ? getFirestore(app, firebaseConfig.firestoreDatabaseId)
-  : getFirestore(app);
+// Determine specific firestore database ID from applet config
+const targetDatabaseId = firebaseConfig.firestoreDatabaseId && firebaseConfig.firestoreDatabaseId !== '(default)'
+  ? firebaseConfig.firestoreDatabaseId
+  : undefined;
+
+// Initialize Firestore with ignoreUndefinedProperties to prevent Firebase errors on undefined fields
+let dbInstance;
+try {
+  dbInstance = initializeFirestore(app, {
+    ignoreUndefinedProperties: true,
+  }, targetDatabaseId);
+} catch {
+  dbInstance = targetDatabaseId ? getFirestore(app, targetDatabaseId) : getFirestore(app);
+}
+
+export const db = dbInstance;
 
 const EVENTS_COLLECTION = 'events';
 const REGISTRATIONS_COLLECTION = 'registrations';
+
+/**
+ * Deeply sanitizes any object or array by removing `undefined` keys
+ * to ensure 100% compatibility with Firestore document writes.
+ */
+export function sanitizeForFirestore(obj: any): any {
+  if (obj === undefined) {
+    return null;
+  }
+  if (obj === null || typeof obj !== 'object') {
+    return obj;
+  }
+  if (Array.isArray(obj)) {
+    return obj
+      .filter((item) => item !== undefined)
+      .map((item) => sanitizeForFirestore(item));
+  }
+  const clean: Record<string, any> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value !== undefined) {
+      clean[key] = sanitizeForFirestore(value);
+    }
+  }
+  return clean;
+}
+
+// Test connection on boot
+export async function testConnection(): Promise<boolean> {
+  try {
+    await getDocFromServer(doc(db, 'test', 'connection'));
+    return true;
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('the client is offline')) {
+      console.warn('Firestore notice: client appears offline.');
+      return false;
+    }
+    // Expected if test/connection doesn't exist, but connection handshake succeeded
+    return true;
+  }
+}
+testConnection();
 
 /**
  * Seeds initial event data into Firestore if collection is empty.
@@ -42,15 +95,16 @@ export async function seedEventsIfEmpty(): Promise<void> {
       
       for (const event of INITIAL_EVENTS) {
         const docRef = doc(db, EVENTS_COLLECTION, event.id);
-        batch.set(docRef, {
+        const payload = sanitizeForFirestore({
           ...event,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
         });
+        batch.set(docRef, payload);
       }
       
       await batch.commit();
-      console.log('Seeding completed successfully.');
+      console.log('Seeding completed successfully into Firestore.');
     }
   } catch (error) {
     console.error('Error checking or seeding initial events in Firestore:', error);
@@ -68,10 +122,10 @@ export function subscribeToEvents(
   
   return onSnapshot(
     eventsRef,
-    (snapshot) => {
+    async (snapshot) => {
       if (snapshot.empty) {
         // Trigger seed if empty, and fallback to initial events
-        seedEventsIfEmpty();
+        await seedEventsIfEmpty();
         onUpdate(INITIAL_EVENTS);
         return;
       }
@@ -122,41 +176,54 @@ export function subscribeToEvents(
  * Creates a new event in Firestore.
  */
 export async function createEventInFirestore(eventData: Omit<KpmbpEvent, 'id'>): Promise<string> {
-  const eventsRef = collection(db, EVENTS_COLLECTION);
-  const newDocRef = doc(eventsRef);
-  const eventId = newDocRef.id;
+  try {
+    const eventsRef = collection(db, EVENTS_COLLECTION);
+    const newDocRef = doc(eventsRef);
+    const eventId = newDocRef.id;
 
-  await setDoc(newDocRef, {
-    ...eventData,
-    id: eventId,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  });
+    const payload = sanitizeForFirestore({
+      ...eventData,
+      id: eventId,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    });
 
-  return eventId;
+    await setDoc(newDocRef, payload);
+    return eventId;
+  } catch (error) {
+    console.error('Error in createEventInFirestore:', error);
+    throw error;
+  }
 }
 
 /**
  * Updates an existing event in Firestore.
  */
 export async function updateEventInFirestore(event: KpmbpEvent): Promise<void> {
-  const docRef = doc(db, EVENTS_COLLECTION, event.id);
-  await setDoc(
-    docRef,
-    {
+  try {
+    const docRef = doc(db, EVENTS_COLLECTION, event.id);
+    const payload = sanitizeForFirestore({
       ...event,
       updatedAt: new Date().toISOString()
-    },
-    { merge: true }
-  );
+    });
+    await setDoc(docRef, payload, { merge: true });
+  } catch (error) {
+    console.error('Error in updateEventInFirestore:', error);
+    throw error;
+  }
 }
 
 /**
  * Deletes an event from Firestore.
  */
 export async function deleteEventInFirestore(eventId: string): Promise<void> {
-  const docRef = doc(db, EVENTS_COLLECTION, eventId);
-  await deleteDoc(docRef);
+  try {
+    const docRef = doc(db, EVENTS_COLLECTION, eventId);
+    await deleteDoc(docRef);
+  } catch (error) {
+    console.error('Error in deleteEventInFirestore:', error);
+    throw error;
+  }
 }
 
 /**
@@ -165,10 +232,11 @@ export async function deleteEventInFirestore(eventId: string): Promise<void> {
 export async function saveRegistrationToFirestore(record: RegistrationRecord): Promise<void> {
   try {
     const regRef = collection(db, REGISTRATIONS_COLLECTION);
-    await addDoc(regRef, {
+    const payload = sanitizeForFirestore({
       ...record,
       createdAt: serverTimestamp()
     });
+    await addDoc(regRef, payload);
   } catch (error) {
     console.error('Error saving registration to Firestore:', error);
     throw error;
