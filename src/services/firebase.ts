@@ -69,10 +69,10 @@ export function sanitizeForFirestore(obj: any): any {
 export function getLocalEventsCache(): KpmbpEvent[] {
   if (typeof window === 'undefined') return INITIAL_EVENTS;
   try {
-    const raw = localStorage.getItem('kpmbp_events_v1');
-    if (raw) {
+    const raw = localStorage.getItem('kpmbp_events_v2');
+    if (raw !== null) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
+      if (Array.isArray(parsed)) {
         return parsed;
       }
     }
@@ -84,7 +84,7 @@ export function getLocalEventsCache(): KpmbpEvent[] {
 export function saveLocalEventsCache(events: KpmbpEvent[]): void {
   if (typeof window === 'undefined') return;
   try {
-    localStorage.setItem('kpmbp_events_v1', JSON.stringify(events));
+    localStorage.setItem('kpmbp_events_v2', JSON.stringify(events));
   } catch {}
 }
 

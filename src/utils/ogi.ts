@@ -1,98 +1,15 @@
 import { KpmbpEvent } from '../types';
 import { formatDateMalay, formatDeadlineMalay, formatDateDMY } from './calendar';
 
-/**
- * SOURCE IMAGE UTAMA (Centralized & Configurable)
- * Direct Raw Image URL dari GitHub repository tanpa melalui web viewer blob.
- */
-export const DEFAULT_OGI_SOURCE_URL =
-  'https://raw.githubusercontent.com/syncrozz/syncrozz-assets/main/OGI/OGI.Event.v3.jpg';
-
-export interface OGIConfig {
-  sourceUrl: string;
-}
+export const DEFAULT_FALLBACK_BANNER =
+  'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=1200&q=80';
 
 /**
- * Konfigurasi Berpusat OGI
- * Membolehkan URL sumber OGI ditukar pada masa hadapan secara modular tanpa mengubah logik utama.
+ * Generates a dedicated, modern, high-definition event poster canvas if no direct image was uploaded.
  */
-export const ogiConfig: OGIConfig = {
-  sourceUrl: DEFAULT_OGI_SOURCE_URL
-};
-
-/**
- * Memuatkan imej sumber secara asynchronous dengan cross-origin support.
- * Sekiranya gagal dicapai, menghasilkan mesej ralat yang jelas mengikut spesifikasi.
- */
-export function loadOGISourceImage(url = ogiConfig.sourceUrl): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-
-    img.onload = () => {
-      resolve(img);
-    };
-
-    img.onerror = () => {
-      reject(
-        new Error(
-          `Ralat: Sumber imej OGI tidak dapat diakses daripada URL: ${url}. Sila pastikan pautan imej raw adalah sah dan boleh dicapai.`
-        )
-      );
-    };
-
-    img.src = url;
-  });
-}
-
-/**
- * Helper untuk membalut teks panjang (word-wrapping) dalam kanvas kanvas grafik 2D.
- */
-function wrapCanvasText(
-  ctx: CanvasRenderingContext2D,
-  text: string,
-  maxWidth: number
-): string[] {
-  const words = text.split(' ');
-  const lines: string[] = [];
-  let currentLine = '';
-
-  for (let i = 0; i < words.length; i++) {
-    const word = words[i];
-    const testLine = currentLine ? `${currentLine} ${word}` : word;
-    const metrics = ctx.measureText(testLine);
-
-    if (metrics.width > maxWidth && currentLine) {
-      lines.push(currentLine);
-      currentLine = word;
-    } else {
-      currentLine = testLine;
-    }
-  }
-
-  if (currentLine) {
-    lines.push(currentLine);
-  }
-
-  return lines;
-}
-
-/**
- * PRINSIP: SOURCE → TEMPLATE → DYNAMIC EVENT DATA → FINAL OGI
- * 
- * Menjana imej Open Graph dinamik dengan melapiskan data acara ke atas 
- * template sumber OGI asal tanpa mereka bentuk semula template.
- */
-export async function generateEventOGImage(
-  event: KpmbpEvent,
-  sourceUrl = ogiConfig.sourceUrl
-): Promise<string> {
-  // 1. Dapatkan template imej daripada SOURCE URL secara terus
-  const templateImg = await loadOGISourceImage(sourceUrl);
-
-  const width = templateImg.naturalWidth || 1200;
-  const height = templateImg.naturalHeight || 630;
-
+export async function generateDedicatedEventPoster(event: KpmbpEvent): Promise<string> {
+  const width = 1200;
+  const height = 1200; // Crisp square poster format
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
@@ -102,131 +19,283 @@ export async function generateEventOGImage(
     throw new Error('Ralat: Kanvas 2D tidak disokong oleh pelayar web.');
   }
 
-  // 2. Kekalkan struktur visual, komposisi, dan gaya asal dengan melukis background template penuh
-  ctx.drawImage(templateImg, 0, 0, width, height);
+  // 1. Gradient Background matching KPMBP event aesthetic
+  const bgGradient = ctx.createLinearGradient(0, 0, width, height);
+  bgGradient.addColorStop(0, '#0F172A'); // Deep Slate
+  bgGradient.addColorStop(0.5, '#1E1B4B'); // Indigo 950
+  bgGradient.addColorStop(1, '#090D16'); // Dark Base
+  ctx.fillStyle = bgGradient;
+  ctx.fillRect(0, 0, width, height);
 
-  // 3. Masukkan kandungan dinamik yang berkaitan dengan acara (Dynamic Event Data)
-  const isOnline = event.eventMode === 'online';
-  const { full: fullDateMalay } = formatDateMalay(event.date);
+  // Decorative Accent Blobs
+  const radGrad1 = ctx.createRadialGradient(1000, 200, 10, 1000, 200, 500);
+  radGrad1.addColorStop(0, 'rgba(99, 102, 241, 0.25)');
+  radGrad1.addColorStop(1, 'rgba(99, 102, 241, 0)');
+  ctx.fillStyle = radGrad1;
+  ctx.fillRect(0, 0, width, height);
 
-  // Skala rujukan berasaskan saiz sebenar kanvas (default 1200 x 630)
-  const scale = width / 1200;
+  const radGrad2 = ctx.createRadialGradient(200, 1000, 10, 200, 1000, 500);
+  radGrad2.addColorStop(0, 'rgba(245, 158, 11, 0.2)');
+  radGrad2.addColorStop(1, 'rgba(245, 158, 11, 0)');
+  ctx.fillStyle = radGrad2;
+  ctx.fillRect(0, 0, width, height);
 
-  // Kawasan kandungan dinamik di bahagian kiri/tengah kanvas OGI
-  const contentX = 72 * scale;
-  const maxTextWidth = 720 * scale;
+  // Outer Border Frame
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+  ctx.lineWidth = 12;
+  ctx.strokeRect(36, 36, width - 72, height - 72);
 
-  // Dynamic: Kategori & Status Badge
+  // Inner Subtle Golden Accent Line
+  ctx.strokeStyle = 'rgba(251, 191, 36, 0.4)';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(52, 52, width - 104, height - 104);
+
+  // 2. Header Branding: KPMBP Event Hub
   ctx.save();
-  ctx.font = `bold ${Math.round(18 * scale)}px "Plus Jakarta Sans", sans-serif`;
-  const badgeText = `${event.category.toUpperCase()} • ${isOnline ? 'ONLINE' : 'FIZIKAL'}`;
-  const badgeWidth = ctx.measureText(badgeText).width + 24 * scale;
-  const badgeHeight = 34 * scale;
-  const badgeY = 160 * scale;
+  ctx.fillStyle = '#F8FAFC';
+  ctx.font = '900 24px "Plus Jakarta Sans", sans-serif';
+  ctx.letterSpacing = '3px';
+  ctx.fillText('KOLEJ PROFESIONAL MARA BANDAR PENAWAR', 80, 110);
 
-  ctx.fillStyle = 'rgba(79, 70, 229, 0.9)'; // Indigo accent
-  ctx.beginPath();
-  ctx.roundRect(contentX, badgeY, badgeWidth, badgeHeight, 8 * scale);
-  ctx.fill();
-
-  ctx.fillStyle = '#FFFFFF';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(badgeText, contentX + 12 * scale, badgeY + badgeHeight / 2);
+  ctx.fillStyle = '#FCD34D'; // Amber 300
+  ctx.font = '700 16px "Plus Jakarta Sans", sans-serif';
+  ctx.fillText('PORTAL RASMI ACARA & PROGRAM SISWA', 80, 140);
   ctx.restore();
 
-  // Dynamic: Nama Event (Tajuk Acara)
+  // 3. Category & Mode Badge (Pastel Yellow Highlight)
+  const isOnline = event.eventMode === 'online';
+  const badgeText = `${event.category.toUpperCase()} • ${isOnline ? 'ONLINE' : 'FIZIKAL'}`;
+  
   ctx.save();
-  ctx.fillStyle = '#0F172A'; // Dark slate
-  ctx.font = `800 ${Math.round(36 * scale)}px "Plus Jakarta Sans", sans-serif`;
+  ctx.font = '800 20px "Plus Jakarta Sans", sans-serif';
+  const badgeW = ctx.measureText(badgeText).width + 36;
+  const badgeH = 46;
+  const badgeX = 80;
+  const badgeY = 190;
+
+  // Pastel Yellow Badge Pill
+  ctx.fillStyle = '#FEF3C7'; // Amber 100
+  ctx.beginPath();
+  ctx.roundRect(badgeX, badgeY, badgeW, badgeH, 12);
+  ctx.fill();
+
+  ctx.strokeStyle = '#FCD34D'; // Amber 300
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  ctx.fillStyle = '#451A03'; // Amber 950
+  ctx.textBaseline = 'middle';
+  ctx.fillText(badgeText, badgeX + 18, badgeY + badgeH / 2);
+  ctx.restore();
+
+  // 4. Event Title
+  ctx.save();
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = '900 52px "Plus Jakarta Sans", sans-serif';
   ctx.textBaseline = 'top';
 
-  const titleStartY = 210 * scale;
-  const titleLines = wrapCanvasText(ctx, event.title, maxTextWidth).slice(0, 3);
-  const lineHeight = 46 * scale;
+  const titleX = 80;
+  const titleY = 270;
+  const maxTitleW = width - 160;
 
-  titleLines.forEach((line, idx) => {
-    ctx.fillText(line, contentX, titleStartY + idx * lineHeight);
+  const wrapText = (text: string, maxWidth: number) => {
+    const words = text.split(' ');
+    const lines: string[] = [];
+    let curLine = '';
+    for (const w of words) {
+      const test = curLine ? `${curLine} ${w}` : w;
+      if (ctx.measureText(test).width > maxWidth && curLine) {
+        lines.push(curLine);
+        curLine = w;
+      } else {
+        curLine = test;
+      }
+    }
+    if (curLine) lines.push(curLine);
+    return lines;
+  };
+
+  const titleLines = wrapText(event.title, maxTitleW).slice(0, 3);
+  titleLines.forEach((l, i) => {
+    ctx.fillText(l, titleX, titleY + i * 66);
   });
   ctx.restore();
 
-  // Dynamic: Maklumat Tarikh, Masa / Penyerahan, Lokasi & Anjuran
-  const metaStartY = titleStartY + (titleLines.length * lineHeight) + 24 * scale;
+  // 5. Main Information Box
+  const infoBoxY = titleY + (titleLines.length * 66) + 36;
+  const infoBoxH = 340;
+  
   ctx.save();
-
-  // Box Maklumat Acara (Subtle container)
-  const metaBoxHeight = 150 * scale;
-  ctx.fillStyle = 'rgba(248, 250, 252, 0.92)';
-  ctx.strokeStyle = 'rgba(226, 232, 240, 0.8)';
-  ctx.lineWidth = 1.5 * scale;
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.06)';
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+  ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.roundRect(contentX, metaStartY, maxTextWidth, metaBoxHeight, 14 * scale);
+  ctx.roundRect(80, infoBoxY, width - 160, infoBoxH, 20);
   ctx.fill();
   ctx.stroke();
 
-  // Data 1: Tarikh
-  ctx.fillStyle = '#334155';
-  ctx.font = `700 ${Math.round(18 * scale)}px "Plus Jakarta Sans", sans-serif`;
-  ctx.fillText(`📅  Tarikh: ${fullDateMalay} (${formatDateDMY(event.date)})`, contentX + 20 * scale, metaStartY + 28 * scale);
+  const { full: fullDateMalay } = formatDateMalay(event.date);
 
-  // Data 2: Masa / Lokasi atau Due Submission
+  // Item 1: Tarikh
+  ctx.fillStyle = '#FCD34D'; // Amber 300
+  ctx.font = '900 24px "Plus Jakarta Sans", sans-serif';
+  ctx.fillText('📅  TARIKH ACARA:', 115, infoBoxY + 50);
+
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = '700 26px "Plus Jakarta Sans", sans-serif';
+  ctx.fillText(`${fullDateMalay} (${formatDateDMY(event.date)})`, 115, infoBoxY + 90);
+
+  // Item 2: Masa & Lokasi / Submission
+  ctx.fillStyle = '#93C5FD'; // Blue 300
+  ctx.font = '900 22px "Plus Jakarta Sans", sans-serif';
+  ctx.fillText('📍  LOKASI & MASA:', 115, infoBoxY + 150);
+
+  ctx.fillStyle = '#E2E8F0';
+  ctx.font = '600 24px "Plus Jakarta Sans", sans-serif';
   if (isOnline) {
     const dueStr = event.submissionDeadline ? formatDeadlineMalay(event.submissionDeadline) : 'Sebelum 11:59 PM';
-    ctx.fillStyle = '#B45309'; // Amber 700
-    ctx.fillText(`⏳  Tarikh Akhir Penyerahan: ${dueStr}`, contentX + 20 * scale, metaStartY + 64 * scale);
+    ctx.fillText(`Online Platform • Tarikh Akhir: ${dueStr}`, 115, infoBoxY + 188);
   } else {
-    const timeStr = `${event.startTime}${event.endTime ? ` - ${event.endTime}` : ''}`;
-    const locStr = event.location || 'KPM Beranang (KPMBP)';
-    ctx.fillStyle = '#334155';
-    ctx.fillText(`🕒  Masa: ${timeStr}   |   📍  Lokasi: ${locStr}`, contentX + 20 * scale, metaStartY + 64 * scale);
+    const timeStr = `${event.startTime}${event.endTime ? ` – ${event.endTime}` : ''}`;
+    const locStr = event.location || 'Kampus KPMBP';
+    ctx.fillText(`${locStr}  (${timeStr})`, 115, infoBoxY + 188);
   }
 
-  // Data 3: Anjuran & Kelayakan
-  ctx.fillStyle = '#475569';
-  ctx.font = `600 ${Math.round(16 * scale)}px "Plus Jakarta Sans", sans-serif`;
-  const orgStr = `👤  Anjuran: ${event.organiser}`;
-  ctx.fillText(orgStr, contentX + 20 * scale, metaStartY + 102 * scale);
+  // Item 3: Penganjur
+  ctx.fillStyle = '#CBD5E1';
+  ctx.font = '900 20px "Plus Jakarta Sans", sans-serif';
+  ctx.fillText('👤  ANJURAN:', 115, infoBoxY + 248);
 
-  // Dynamic: Merit & Pendaftaran Footer
-  const regModeLabel = 
-    event.registrationMode === 'none' 
-      ? 'Terbuka / Walk-in' 
-      : event.registrationMode === 'google_form' 
-        ? 'Borang Daftar Disediakan' 
-        : 'Pendaftaran Urusetia';
-
-  ctx.fillStyle = '#64748B';
-  ctx.font = `500 ${Math.round(14 * scale)}px "Plus Jakarta Sans", sans-serif`;
-  ctx.fillText(
-    `🎖️ MARA Merit Diperuntukkan  •  🎟️ ${regModeLabel}  •  Portal Rasmi Event KPMBP`, 
-    contentX, 
-    metaStartY + metaBoxHeight + 24 * scale
-  );
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = '700 22px "Plus Jakarta Sans", sans-serif';
+  ctx.fillText(event.organiser, 115, infoBoxY + 284);
 
   ctx.restore();
 
-  // 4. Hasilkan data image URL akhir (Final OGI)
+  // 6. Footer Notes & Merit
+  ctx.save();
+  ctx.fillStyle = '#10B981'; // Emerald 500
+  ctx.font = '800 22px "Plus Jakarta Sans", sans-serif';
+  ctx.fillText('🎖️  MARA MERIT DIPERUNTUKKAN BAGI SEMUA PESERTA', 80, height - 140);
+
+  ctx.fillStyle = '#94A3B8';
+  ctx.font = '600 18px "Plus Jakarta Sans", sans-serif';
+  ctx.fillText(`Syarat: ${event.eligibility}  •  Hubungi: ${event.contact || 'Urusetia Program'}`, 80, height - 100);
+  ctx.restore();
+
   return canvas.toDataURL('image/jpeg', 0.95);
 }
 
 /**
- * Muat turun imej OGI yang dijana secara automatik.
+ * Muat turun poster rasmi acara yang dimuat naik oleh penganjur/admin.
+ * Jika penganjur memuat naik poster (event.image), poster sebenar dimuat turun terus.
  */
-export async function downloadEventOGImage(event: KpmbpEvent, filename?: string): Promise<void> {
-  const dataUrl = await generateEventOGImage(event);
-  const cleanTitle = event.title.replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 40);
-  const safeFilename = filename || `OGI_KPMBP_${cleanTitle}.jpg`;
+export async function downloadEventPoster(event: KpmbpEvent, filename?: string): Promise<void> {
+  const cleanTitle = (event.title || 'Event')
+    .replace(/[^a-zA-Z0-9_-]/g, '_')
+    .replace(/_+/g, '_')
+    .substring(0, 40);
+  const safeFilename = filename || `Poster_KPMBP_${cleanTitle}.jpg`;
 
+  // 1. Semak sama ada penganjur telah memuat naik poster (event.image)
+  if (event.image && typeof event.image === 'string' && event.image.trim().length > 0) {
+    const posterUrl = event.image.trim();
+
+    // A. Base64 Data URL (Muat naik terus dari fail lokal)
+    if (posterUrl.startsWith('data:')) {
+      const link = document.createElement('a');
+      link.href = posterUrl;
+      link.download = safeFilename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      return;
+    }
+
+    // B. Blob / Object URL
+    if (posterUrl.startsWith('blob:')) {
+      const link = document.createElement('a');
+      link.href = posterUrl;
+      link.download = safeFilename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      return;
+    }
+
+    // C. Web URL (HTTP / HTTPS)
+    try {
+      const res = await fetch(posterUrl, { mode: 'cors' });
+      if (res.ok) {
+        const blob = await res.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = safeFilename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 2000);
+        return;
+      }
+    } catch {
+      // CORS fetch fallback via Canvas
+    }
+
+    try {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error('Gagal memuat imej poster.'));
+        img.src = posterUrl;
+      });
+
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth || 1200;
+      canvas.height = img.naturalHeight || 800;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(img, 0, 0);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+        const link = document.createElement('a');
+        link.href = dataUrl;
+        link.download = safeFilename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        return;
+      }
+    } catch {
+      // Direct link fallback
+      const link = document.createElement('a');
+      link.href = posterUrl;
+      link.download = safeFilename;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      return;
+    }
+  }
+
+  // 2. Jika penganjur belum memuat naik imej poster khas, jana poster visual dinamik mengikut data acara sebenar
+  const dynamicPosterDataUrl = await generateDedicatedEventPoster(event);
   const link = document.createElement('a');
-  link.href = dataUrl;
+  link.href = dynamicPosterDataUrl;
   link.download = safeFilename;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
 }
 
+// Backward compatibility alias for any existing references
+export const downloadEventOGImage = downloadEventPoster;
+
 /**
  * Mengemaskini tag meta Open Graph & Twitter dalam <head> dokumen
- * menggunakan URL sumber OGI berpusat atau data acara aktif.
+ * menggunakan imej poster acara sebenar penganjur.
  */
 export function updateDocumentOpenGraph(event?: KpmbpEvent | null) {
   if (typeof document === 'undefined') return;
@@ -237,10 +306,10 @@ export function updateDocumentOpenGraph(event?: KpmbpEvent | null) {
 
   const description = event
     ? `${event.category} - Tarikh: ${formatDateDMY(event.date)} | ${event.eventMode === 'online' ? 'Online' : event.location || 'KPMBP'}. Anjuran: ${event.organiser}`
-    : 'Pusat Acara & Program Rasmi Kolej Professional MARA Bandar Penawar (KPMBP)';
+    : 'Pusat Acara & Program Rasmi Kolej Profesional MARA Bandar Penawar (KPMBP)';
 
-  // Gunakan raw image URL sumber terus
-  const imageUrl = ogiConfig.sourceUrl;
+  // Gunakan imej poster penganjur jika ada
+  const imageUrl = event?.image || DEFAULT_FALLBACK_BANNER;
 
   const setMetaTag = (propertyOrName: string, value: string, isName = false) => {
     const selector = isName ? `meta[name="${propertyOrName}"]` : `meta[property="${propertyOrName}"]`;

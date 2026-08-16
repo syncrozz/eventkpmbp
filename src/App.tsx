@@ -18,17 +18,18 @@ import {
   updateEventInFirestore, 
   deleteEventInFirestore, 
   saveRegistrationToFirestore,
-  seedEventsIfEmpty
+  seedEventsIfEmpty,
+  saveLocalEventsCache
 } from './services/firebase';
 import { Sparkles, Calendar as CalendarIcon, Filter, Flame, CheckCircle2, ShieldCheck, Bookmark, Lock, KeyRound, Archive, Cloud } from 'lucide-react';
 
 export default function App() {
   const [events, setEvents] = useState<KpmbpEvent[]>(() => {
     try {
-      const saved = localStorage.getItem('kpmbp_events_v1');
-      if (saved) {
+      const saved = localStorage.getItem('kpmbp_events_v2');
+      if (saved !== null) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) return parsed;
       }
     } catch {
       // Fallback
@@ -214,7 +215,7 @@ export default function App() {
 
     setEvents((prev) => {
       const next = [createdEvent, ...prev.filter((e) => e.id !== createdEvent.id)];
-      try { localStorage.setItem('kpmbp_events_v1', JSON.stringify(next)); } catch {}
+      try { localStorage.setItem('kpmbp_events_v2', JSON.stringify(next)); } catch {}
       return next;
     });
     showToast(`Acara "${newEventData.title}" berjaya diterbitkan & disimpan!`);
@@ -224,7 +225,7 @@ export default function App() {
     // 1. Immediately update React state & localStorage for instantaneous reflection
     setEvents((prev) => {
       const next = prev.map((e) => (e.id === updated.id ? updated : e));
-      try { localStorage.setItem('kpmbp_events_v1', JSON.stringify(next)); } catch {}
+      try { localStorage.setItem('kpmbp_events_v2', JSON.stringify(next)); } catch {}
       return next;
     });
 
@@ -255,10 +256,10 @@ export default function App() {
     const targetTitle = eventToDelete.title;
     const targetId = eventToDelete.id;
 
-    // 1. Immediately update state
+    // 1. Immediately update state & storage
     setEvents((prev) => {
       const next = prev.filter((e) => e.id !== targetId);
-      try { localStorage.setItem('kpmbp_events_v1', JSON.stringify(next)); } catch {}
+      try { localStorage.setItem('kpmbp_events_v2', JSON.stringify(next)); } catch {}
       return next;
     });
     if (selectedEventForDetail?.id === targetId) {
@@ -287,9 +288,11 @@ export default function App() {
 
   const handleSeedSampleData = async () => {
     try {
-      showToast('Memuat semula set acara contoh rasmi KPMBP ke Firestore...');
+      showToast('Memuat semula set 3 acara contoh rasmi KPMBP...');
+      setEvents(INITIAL_EVENTS);
+      saveLocalEventsCache(INITIAL_EVENTS);
       await seedEventsIfEmpty(true);
-      showToast('Data contoh KPMBP berjaya dimuatkan semula ke Firebase Cloud!');
+      showToast('3 Acara demo KPMBP berjaya dimuatkan semula!');
     } catch (err) {
       console.error('Error seeding data:', err);
       showToast('Gagal memuat semula data contoh.');

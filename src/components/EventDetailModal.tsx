@@ -13,8 +13,7 @@ import {
 } from '../utils/calendar';
 import { 
   updateDocumentOpenGraph,
-  downloadEventOGImage,
-  DEFAULT_OGI_SOURCE_URL
+  downloadEventPoster
 } from '../utils/ogi';
 import { 
   X, Calendar, Clock, MapPin, User, ShieldAlert, 
@@ -94,14 +93,14 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
     window.open(`https://t.me/share/url?url=${url}&text=${text}`, '_blank');
   };
 
-  const handleDownloadOGI = async () => {
+  const handleDownloadPoster = async () => {
     try {
       setIsGeneratingOgi(true);
       setOgiError(null);
-      await downloadEventOGImage(event);
+      await downloadEventPoster(event);
     } catch (err: any) {
-      console.error('OGI Generation failed:', err);
-      setOgiError(err?.message || 'Ralat: Sumber imej OGI tidak dapat diakses.');
+      console.error('Poster download failed:', err);
+      setOgiError(err?.message || 'Ralat: Gagal memuat turun poster acara.');
     } finally {
       setIsGeneratingOgi(false);
     }
@@ -289,10 +288,25 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
           {/* Official Poster Display if Available */}
           {event.image && (
             <div>
-              <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">
-                Poster Rasmi Program
-              </h3>
-              <div className="bg-slate-900/5 border border-slate-200/80 rounded-2xl p-2 sm:p-4 flex flex-col items-center justify-center">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400">
+                  Poster Rasmi Program
+                </h3>
+                <button
+                  onClick={handleDownloadPoster}
+                  disabled={isGeneratingOgi}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-bold transition-all shadow-2xs active:scale-95 disabled:opacity-50"
+                  title="Muat turun fail poster rasmi program ini"
+                >
+                  {isGeneratingOgi ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-600" />
+                  ) : (
+                    <Download className="w-3.5 h-3.5 text-indigo-600" />
+                  )}
+                  <span>{isGeneratingOgi ? 'Memuat Turun...' : 'Muat Turun Poster'}</span>
+                </button>
+              </div>
+              <div className="bg-slate-900/5 border border-slate-200/80 rounded-2xl p-2 sm:p-4 flex flex-col items-center justify-center relative group">
                 <img
                   src={event.image}
                   alt={`Poster ${event.title}`}
@@ -398,17 +412,17 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
               </button>
 
               <button
-                onClick={handleDownloadOGI}
+                onClick={handleDownloadPoster}
                 disabled={isGeneratingOgi}
                 className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-bold transition-colors shadow-2xs disabled:opacity-60"
-                title="Jana & Muat Turun Poster Acara berasaskan template rasmi"
+                title="Muat turun poster rasmi program ini"
               >
                 {isGeneratingOgi ? (
                   <Loader2 className="w-4 h-4 animate-spin text-indigo-600" />
                 ) : (
                   <Download className="w-4 h-4 text-indigo-600" />
                 )}
-                <span>{isGeneratingOgi ? 'Menjana Poster...' : 'Muat Turun Poster'}</span>
+                <span>{isGeneratingOgi ? 'Memuat Turun...' : 'Muat Turun Poster'}</span>
               </button>
             </div>
 
