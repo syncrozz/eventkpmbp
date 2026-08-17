@@ -1,12 +1,18 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { KpmbpEvent, EventCategory, EventStatus, RegistrationRecord, RegistrationMode } from '../types';
-import { subscribeToRegistrations } from '../services/firebase';
+import { 
+  subscribeToAllRegistrations, 
+  deleteExistingRegistration, 
+  getActiveBackendLabel, 
+  getActiveBackendType 
+} from '../services/dbAdapter';
+import { SUPABASE_SQL_SETUP, isSupabaseConfigured, checkSupabaseHealth } from '../services/supabase';
 import { formatDateDMY, formatDeadlineMalay, getCategoryBadgeClass } from '../utils/calendar';
 import { optimizeEventImage } from '../utils/imageOptimizer';
 import { 
   Plus, Trash2, Edit2, ShieldCheck, Check, Sparkles, AlertCircle, 
   Image as ImageIcon, Upload, Link as LinkIcon, X, Eye, Cloud, Users, 
-  Search, Phone, Mail, Calendar, Download, RefreshCw, Loader2
+  Search, Phone, Mail, Calendar, Download, RefreshCw, Loader2, Database, Copy, CheckCheck, WifiOff
 } from 'lucide-react';
 
 interface AdminPortalProps {
@@ -32,9 +38,35 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const [registrations, setRegistrations] = useState<RegistrationRecord[]>([]);
   const [regSearchQuery, setRegSearchQuery] = useState('');
   const [selectedRegEventId, setSelectedRegEventId] = useState<string>('all');
+  const [showSqlModal, setShowSqlModal] = useState(false);
+  const [copiedSql, setCopiedSql] = useState(false);
+  const [supabaseHealth, setSupabaseHealth] = useState<{ checked: boolean; connected: boolean; message: string }>({
+    checked: false,
+    connected: false,
+    message: ''
+  });
 
   const [editingEvent, setEditingEvent] = useState<KpmbpEvent | null>(null);
   const [isCreating, setIsCreating] = useState(false);
+
+  // Check live Supabase connection status on mount
+  useEffect(() => {
+    if (isSupabaseConfigured()) {
+      checkSupabaseHealth().then((res) => {
+        setSupabaseHealth({
+          checked: true,
+          connected: res.connected,
+          message: res.message
+        });
+      });
+    } else {
+      setSupabaseHealth({
+        checked: true,
+        connected: false,
+        message: 'Konfigurasi VITE_SUPABASE_URL belum dimasukkan.'
+      });
+    }
+  }, []);
 
   // Auto-load initialEditingEvent if requested from card/modal
   useEffect(() => {
@@ -46,9 +78,9 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     }
   }, [initialEditingEvent]);
 
-  // Subscribe to live student registrations from Firestore
+  // Subscribe to live student registrations across active cloud backend
   useEffect(() => {
-    const unsub = subscribeToRegistrations((list) => {
+    const unsub = subscribeToAllRegistrations((list) => {
       setRegistrations(list);
     });
     return () => unsub();
@@ -240,17 +272,42 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
               <ShieldCheck className="w-4 h-4 text-emerald-400" />
               <span>Portal Pentadbir Event</span>
             </div>
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full text-[11px] font-bold">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <Cloud className="w-3.5 h-3.5" />
-              <span>Firebase Cloud Live Sync</span>
-            </div>
+            
+            {getActiveBackendType() === 'supabase' ? (
+              supabaseHealth.connected ? (
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-300 rounded-full text-[11px] font-bold">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <Database className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Supabase PostgreSQL (Aktif & Live Sync)</span>
+                </div>
+              ) : (
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-rose-50 text-rose-700 border border-rose-300 rounded-full text-[11px] font-bold">
+                  <WifiOff className="w-3.5 h-3.5 text-rose-600" />
+                  <span>Supabase PostgreSQL (Tidak Bersambung)</span>
+                </div>
+              )
+            ) : (
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-full text-[11px] font-bold">
+                <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
+                <Cloud className="w-3.5 h-3.5 text-indigo-600" />
+                <span>Firebase Cloud / Local Mode</span>
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setShowSqlModal(true)}
+              className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-full text-[11px] font-bold transition-colors"
+            >
+              <Database className="w-3 h-3 text-slate-500" />
+              <span>Skrip SQL Supabase</span>
+            </button>
           </div>
           <h2 className="text-2xl font-black text-slate-900">
             Pengurusan & Penerbitan Acara KPMBP
           </h2>
           <p className="text-xs text-slate-500 mt-1">
-            Data disegerakkan secara langsung dengan pangkalan data awan Firebase Firestore.
+            Enjin Pangkalan Data Semasa: <strong className="text-slate-800 font-bold">{getActiveBackendLabel()}</strong>
           </p>
         </div>
 
@@ -261,7 +318,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                 type="button"
                 onClick={onSeedSampleData}
                 className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3.5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all border border-slate-200/80"
-                title="Muat semula set acara sampel default KPMBP ke Firestore"
+                title="Muat semula set acara sampel default KPMBP"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
                 <span>Muat Semula Sampel</span>
@@ -1138,6 +1195,86 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
               </table>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Supabase SQL Setup Modal */}
+      {showSqlModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-200">
+          <div 
+            className="relative w-full max-w-2xl bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-200 flex flex-col max-h-[85vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="bg-slate-900 text-white p-5 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                  <Database className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-extrabold">Skrip SQL Jadual Supabase</h3>
+                  <p className="text-[11px] text-slate-400">Salin dan laksanakan kod ini di Supabase SQL Editor anda.</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowSqlModal(false)}
+                className="p-1.5 rounded-full bg-white/10 hover:bg-white/20 text-slate-300 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* SQL Content */}
+            <div className="p-5 overflow-y-auto space-y-4 text-xs">
+              <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 text-emerald-900 space-y-1">
+                <p className="font-bold">Langkah Pemasangan di Supabase:</p>
+                <ol className="list-decimal list-inside space-y-1 text-[11px] text-emerald-800">
+                  <li>Buka papan pemuka Supabase anda (<strong>SQL Editor</strong>).</li>
+                  <li>Tampal kod SQL di bawah dan klik <strong>Run</strong>.</li>
+                  <li>Jadual <code>events</code> & <code>registrations</code> berserta polisi keselamatan (RLS) & Realtime akan dicipta secara automatik.</li>
+                </ol>
+              </div>
+
+              <div className="relative">
+                <pre className="p-4 bg-slate-950 text-emerald-300 font-mono text-[11px] rounded-2xl overflow-x-auto leading-relaxed border border-slate-800 max-h-[300px]">
+                  {SUPABASE_SQL_SETUP}
+                </pre>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(SUPABASE_SQL_SETUP);
+                    setCopiedSql(true);
+                    setTimeout(() => setCopiedSql(false), 2500);
+                  }}
+                  className="absolute top-3 right-3 px-3 py-1.5 bg-white/20 hover:bg-white/30 text-white rounded-xl text-[11px] font-bold backdrop-blur-md flex items-center gap-1.5 transition-all shadow-sm"
+                >
+                  {copiedSql ? (
+                    <>
+                      <CheckCheck className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Disalin!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3.5 h-3.5" />
+                      <span>Salin SQL</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowSqlModal(false)}
+                className="px-5 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-black transition-colors"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

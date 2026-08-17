@@ -366,3 +366,18 @@ export function subscribeToRegistrations(
     }
   };
 }
+
+/**
+ * Delete a registration from Firestore and local cache
+ */
+export async function deleteRegistrationFromFirestore(id: string): Promise<void> {
+  const localList = getLocalRegistrationsCache();
+  saveLocalRegistrationsCache(localList.filter((r) => r.id !== id));
+
+  try {
+    const docRef = doc(db, REGISTRATIONS_COLLECTION, id);
+    await deleteDoc(docRef);
+  } catch (err: any) {
+    console.warn('Registration deleted from local cache:', err?.message);
+  }
+}

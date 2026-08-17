@@ -13,14 +13,15 @@ import { AdminPinModal } from './components/AdminPinModal';
 import { DeleteConfirmationModal } from './components/DeleteConfirmationModal';
 import { sortEventsByNearestDue, getCategoryButtonClass, isEventArchived } from './utils/calendar';
 import { 
-  subscribeToEvents, 
-  createEventInFirestore, 
-  updateEventInFirestore, 
-  deleteEventInFirestore, 
-  saveRegistrationToFirestore,
-  seedEventsIfEmpty,
-  saveLocalEventsCache
-} from './services/firebase';
+  subscribeToAllEvents,
+  createNewEvent,
+  updateExistingEvent,
+  deleteExistingEvent,
+  saveNewRegistration,
+  resetAndSeedDemoEvents,
+  getActiveBackendLabel,
+  getActiveBackendType
+} from './services/dbAdapter';
 import { Sparkles, Calendar as CalendarIcon, Filter, Flame, CheckCircle2, ShieldCheck, Bookmark, Lock, KeyRound, Archive, Cloud } from 'lucide-react';
 
 export default function App() {
@@ -75,12 +76,12 @@ export default function App() {
   // Toast Notification
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // 1. Real-time Firebase Firestore synchronization with offline/local-first resilience
+  // 1. Real-time synchronization (Supabase / Firestore / Local Cache)
   useEffect(() => {
-    const unsubscribe = subscribeToEvents(
-      (firestoreEvents) => {
-        if (Array.isArray(firestoreEvents) && firestoreEvents.length > 0) {
-          setEvents(firestoreEvents);
+    const unsubscribe = subscribeToAllEvents(
+      (incomingEvents) => {
+        if (Array.isArray(incomingEvents) && incomingEvents.length > 0) {
+          setEvents(incomingEvents);
           setIsFirebaseConnected(true);
         }
       },
@@ -201,11 +202,11 @@ export default function App() {
     })
   );
 
-  // Admin Actions with Firebase Firestore & local fallback
+  // Admin Actions with Cloud Database & local fallback
   const handleCreateEvent = async (newEventData: Omit<KpmbpEvent, 'id'>) => {
     let createdEvent: KpmbpEvent;
     try {
-      const newId = await createEventInFirestore(newEventData);
+      const newId = await createNewEvent(newEventData);
       createdEvent = { ...newEventData, id: newId };
     } catch (err: any) {
       console.warn('Saving event locally (Cloud notice):', err?.message);
@@ -234,7 +235,7 @@ export default function App() {
     }
 
     try {
-      await updateEventInFirestore(updated);
+      await updateExistingEvent(updated);
     } catch (err: any) {
       console.warn('Notice: Update stored locally (Cloud notice):', err?.message);
     }
@@ -268,7 +269,7 @@ export default function App() {
     setEventToDelete(null);
 
     try {
-      await deleteEventInFirestore(targetId);
+      await deleteExistingEvent(targetId);
     } catch (err: any) {
       console.warn('Notice: Deleted from local storage (Cloud notice):', err?.message);
     } finally {
@@ -290,8 +291,7 @@ export default function App() {
     try {
       showToast('Memuat semula set 3 acara contoh rasmi KPMBP...');
       setEvents(INITIAL_EVENTS);
-      saveLocalEventsCache(INITIAL_EVENTS);
-      await seedEventsIfEmpty(true);
+      await resetAndSeedDemoEvents();
       showToast('3 Acara demo KPMBP berjaya dimuatkan semula!');
     } catch (err) {
       console.error('Error seeding data:', err);
@@ -301,10 +301,10 @@ export default function App() {
 
   const handleRegistrationSuccess = async (record: RegistrationRecord) => {
     try {
-      await saveRegistrationToFirestore(record);
+      await saveNewRegistration(record);
       showToast(`Pendaftaran berjaya direkodkan ke pangkalan data! Kod Pas: ${record.id}`);
     } catch (err) {
-      console.error('Error recording registration in Firestore:', err);
+      console.error('Error recording registration in cloud database:', err);
       showToast(`Pendaftaran dijana! Kod Pas: ${record.id}`);
     }
   };
