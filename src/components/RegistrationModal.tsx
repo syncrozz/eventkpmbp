@@ -18,7 +18,7 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
   const [studentId, setStudentId] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
-  const [programCode, setProgramCode] = useState('DIT');
+  const [programCode, setProgramCode] = useState('DLM');
   const [submittedPass, setSubmittedPass] = useState<RegistrationRecord | null>(null);
 
   useEffect(() => {
@@ -225,7 +225,7 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
                     required
                     value={studentId}
                     onChange={(e) => setStudentId(e.target.value)}
-                    placeholder="DIT202488"
+                    placeholder="PDA-2503-008"
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 uppercase"
                   />
                 </div>
@@ -239,11 +239,11 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
                     onChange={(e) => setProgramCode(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
                   >
-                    <option value="DIT">Diploma Sains Komputer (DIT)</option>
-                    <option value="DIA">Diploma Perakaunan (DIA)</option>
-                    <option value="DBM">Diploma Pengurusan Perniagaan (DBM)</option>
-                    <option value="DIB">Diploma Perbankan Islam (DIB)</option>
-                    <option value="STAF">Staf / Pensyarah KPMBP</option>
+                    <option value="Diploma in Logistik (DLM)">Diploma in Logistik (DLM)</option>
+                    <option value="Diploma in Accounting (DIA)">Diploma in Accounting (DIA)</option>
+                    <option value="Pra Diploma (PRA DIP)">Pra Diploma (PRA DIP)</option>
+                    <option value="Staf / Pensyarah KPMBP">Staf / Pensyarah KPMBP</option>
+                    <option value="Lain-Lain">Lain-Lain</option>
                   </select>
                 </div>
               </div>
@@ -258,7 +258,7 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="amirul@student.kpmbp.edu.my"
+                    placeholder="amirul@bpenawar.kpm.edu.my"
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
                   />
                   <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
