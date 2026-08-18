@@ -94,6 +94,44 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
+  // Deep-linking hash support: Automatically open Event Detail Modal if URL contains #event-ID
+  useEffect(() => {
+    const handleHashCheck = () => {
+      const hash = window.location.hash;
+      if (hash && hash.startsWith('#event-')) {
+        const eventId = hash.replace('#event-', '').trim();
+        if (eventId) {
+          const found = events.find((e) => e.id === eventId || e.id.toLowerCase() === eventId.toLowerCase());
+          if (found) {
+            setSelectedEventForDetail(found);
+          }
+        }
+      }
+    };
+
+    // Check on events change and hashchange event
+    handleHashCheck();
+    window.addEventListener('hashchange', handleHashCheck);
+    return () => window.removeEventListener('hashchange', handleHashCheck);
+  }, [events]);
+
+  // Keep URL hash in sync when modal is opened / closed
+  const handleOpenDetailModal = (evt: KpmbpEvent) => {
+    setSelectedEventForDetail(evt);
+    try {
+      window.history.replaceState(null, '', `#event-${evt.id}`);
+    } catch {}
+  };
+
+  const handleCloseDetailModal = () => {
+    setSelectedEventForDetail(null);
+    try {
+      if (window.location.hash.startsWith('#event-')) {
+        window.history.replaceState(null, '', window.location.pathname + window.location.search);
+      }
+    } catch {}
+  };
+
   // Save bookmarked events to local storage
   useEffect(() => {
     try {
@@ -410,7 +448,7 @@ export default function App() {
                       <EventCard
                         key={event.id}
                         event={event}
-                        onViewDetails={setSelectedEventForDetail}
+                        onViewDetails={handleOpenDetailModal}
                         onRegister={setSelectedEventForRegistration}
                         isSaved={savedEventIds.includes(event.id)}
                         onToggleSave={handleToggleSave}
@@ -429,7 +467,7 @@ export default function App() {
                 events={events}
                 selectedCategory={selectedCategory}
                 onSelectCategory={setSelectedCategory}
-                onViewDetails={setSelectedEventForDetail}
+                onViewDetails={handleOpenDetailModal}
                 onSelectTab={setCurrentTab}
               />
 
@@ -487,7 +525,7 @@ export default function App() {
                 <EventCard
                   key={event.id}
                   event={event}
-                  onViewDetails={setSelectedEventForDetail}
+                  onViewDetails={handleOpenDetailModal}
                   onRegister={setSelectedEventForRegistration}
                   isSaved={savedEventIds.includes(event.id)}
                   onToggleSave={handleToggleSave}
@@ -505,7 +543,7 @@ export default function App() {
           <div className="animate-in fade-in duration-300">
             <CalendarView
               events={events}
-              onViewDetails={setSelectedEventForDetail}
+              onViewDetails={handleOpenDetailModal}
             />
           </div>
         )}
@@ -533,7 +571,7 @@ export default function App() {
                 <EventCard
                   key={event.id}
                   event={event}
-                  onViewDetails={setSelectedEventForDetail}
+                  onViewDetails={handleOpenDetailModal}
                   onRegister={setSelectedEventForRegistration}
                   isSaved={savedEventIds.includes(event.id)}
                   onToggleSave={handleToggleSave}
@@ -587,9 +625,9 @@ export default function App() {
       {/* Detail Modal */}
       <EventDetailModal
         event={selectedEventForDetail}
-        onClose={() => setSelectedEventForDetail(null)}
+        onClose={handleCloseDetailModal}
         onRegister={(evt) => {
-          setSelectedEventForDetail(null);
+          handleCloseDetailModal();
           setSelectedEventForRegistration(evt);
         }}
         isAdmin={isAdminUnlocked}

@@ -202,18 +202,16 @@ export function buildRegistrationWhatsAppUrl(params: {
 export function getEventShareText(event: KpmbpEvent): string {
   const { full: fullDateMalay } = formatDateMalay(event.date);
   const isOnline = event.eventMode === 'online';
-  const url = typeof window !== 'undefined' ? `${window.location.href.split('#')[0]}#event-${event.id}` : '';
+  const url = typeof window !== 'undefined' ? `${window.location.origin}${window.location.pathname}#event-${event.id}` : '';
 
-  let text = `📢 *INFO ACARA KPMBP*\n`;
-  text += `━━━━━━━━━━━━━━━━━━━━━\n`;
-  text += `📌 *${event.title}*\n`;
+  let text = `📌 *${event.title}*\n`;
   text += `🏷️ *Kategori:* ${event.category}\n`;
   text += `📅 *Tarikh:* ${fullDateMalay}\n`;
 
   if (isOnline) {
     text += `🌐 *Mod:* Atas Talian (Online)\n`;
     if (event.submissionDeadline) {
-      text += `⏳ *Tarikh Akhir Penyerahan:* ${formatDeadlineMalay(event.submissionDeadline)}\n`;
+      text += `⏳ *Tarikh Akhir Penyerahan:* ${formatDateDMY(event.submissionDeadline.split('T')[0])}\n`;
     }
   } else {
     text += `🕒 *Masa:* ${event.startTime}${event.endTime ? ` - ${event.endTime}` : ''}\n`;
@@ -231,7 +229,8 @@ export function getEventShareText(event: KpmbpEvent): string {
   } else if (event.registrationMode === 'google_form' && event.registrationUrl) {
     text += `📝 *Borang Daftar:* ${event.registrationUrl}\n`;
     if (event.registrationDeadline) {
-      text += `⏰ *Tarikh Tutup:* ${formatDeadlineMalay(event.registrationDeadline)}\n`;
+      const deadlineDateOnly = event.registrationDeadline.split('T')[0];
+      text += `⏰ *Tarikh Tutup:* ${formatDateDMY(deadlineDateOnly)}\n`;
     }
   } else if (event.registrationMode === 'admin') {
     text += `📝 *Pendaftaran:* Melalui Urusetia KPMBP\n`;
@@ -239,7 +238,8 @@ export function getEventShareText(event: KpmbpEvent): string {
       text += `📱 *WhatsApp Urusetia:* https://wa.me/${event.organiserWhatsApp.replace(/\D/g, '')}\n`;
     }
     if (event.registrationDeadline) {
-      text += `⏰ *Tarikh Tutup:* ${formatDeadlineMalay(event.registrationDeadline)}\n`;
+      const deadlineDateOnly = event.registrationDeadline.split('T')[0];
+      text += `⏰ *Tarikh Tutup:* ${formatDateDMY(deadlineDateOnly)}\n`;
     }
   }
 
