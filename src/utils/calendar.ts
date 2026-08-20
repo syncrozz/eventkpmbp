@@ -255,6 +255,10 @@ export function getEventShareText(event: KpmbpEvent): string {
     text += `\n📞 *Hubungi:* ${event.contact}\n`;
   }
 
+  if (event.organiserUrl) {
+    text += `🌐 *Laman Rasmi Penganjur:* ${event.organiserUrl}\n`;
+  }
+
   if (url) {
     text += `\n🔗 *Maklumat Penuh & Kalendar:* ${url}\n`;
   }

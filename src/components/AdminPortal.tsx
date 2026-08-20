@@ -12,7 +12,7 @@ import { optimizeEventImage } from '../utils/imageOptimizer';
 import { 
   Plus, Trash2, Edit2, ShieldCheck, Check, Sparkles, AlertCircle, 
   Image as ImageIcon, Upload, Link as LinkIcon, X, Eye, Cloud, Users, 
-  Search, Phone, Mail, Calendar, Download, RefreshCw, Loader2, Database, Copy, CheckCheck, WifiOff
+  Search, Phone, Mail, Calendar, Download, RefreshCw, Loader2, Database, Copy, CheckCheck, WifiOff, Globe, ExternalLink
 } from 'lucide-react';
 
 interface AdminPortalProps {
@@ -108,6 +108,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const [totalSeats, setTotalSeats] = useState<string>('');
   const [eligibility, setEligibility] = useState('Terbuka kepada semua warga KPMBP');
   const [contact, setContact] = useState('Urusetia KPMBP - 012-3456789');
+  const [organiserUrl, setOrganiserUrl] = useState('');
 
   const [isCompressingImage, setIsCompressingImage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -140,6 +141,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     setTotalSeats('');
     setEligibility('Terbuka kepada semua warga KPMBP');
     setContact('Urusetia KPMBP - 012-3456789');
+    setOrganiserUrl('');
   };
 
   const handleStartEdit = (evt: KpmbpEvent) => {
@@ -165,6 +167,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     setTotalSeats(evt.totalSeats !== undefined ? evt.totalSeats.toString() : '');
     setEligibility(evt.eligibility);
     setContact(evt.contact);
+    setOrganiserUrl(evt.organiserUrl || '');
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -246,7 +249,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       seatsLeft: registrationMode !== 'none' && seatsLeft !== '' ? parseInt(seatsLeft, 10) : undefined,
       totalSeats: registrationMode !== 'none' && totalSeats !== '' ? parseInt(totalSeats, 10) : undefined,
       eligibility,
-      contact
+      contact,
+      organiserUrl: organiserUrl.trim() || undefined
     };
 
     if (editingEvent) {
@@ -798,6 +802,23 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                   Terbuka & Awam
                 </button>
               </div>
+            </div>
+
+            <div className="md:col-span-2 bg-slate-50/70 border border-slate-200 rounded-2xl p-4">
+              <label className="block text-xs font-extrabold text-slate-900 mb-1 flex items-center gap-1.5">
+                <Globe className="w-4 h-4 text-indigo-600" />
+                <span>Pautan Laman Web / Rujukan Penganjur (Webpages URL - Pilihan)</span>
+              </label>
+              <input
+                type="url"
+                value={organiserUrl}
+                onChange={(e) => setOrganiserUrl(e.target.value)}
+                placeholder="https://kontinjenkpmbp.syncrozz.com atau https://instagram.com/mppkpmbp"
+                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+              />
+              <p className="text-[10px] text-slate-500 mt-1">
+                Sekiranya penganjur mempunyai laman web khas, portal maklumat, atau media sosial rasmi program, masukkan pautan di sini. Butang "Laman Web Penganjur" akan dipaparkan pada butiran acara.
+              </p>
             </div>
 
             {/* Poster Event Attachment Section */}

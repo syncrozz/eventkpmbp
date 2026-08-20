@@ -347,8 +347,55 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                   {event.organiserWhatsApp ? `${event.contact || 'Urusetia'} (${event.organiserWhatsApp})` : event.contact}
                 </span>
               </div>
+              {event.organiserUrl && (
+                <div className="flex items-start gap-2 pt-1 border-t border-slate-100 mt-1">
+                  <span className="font-bold text-slate-800 min-w-[140px]">Laman Web Penganjur:</span>
+                  <a
+                    href={event.organiserUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-indigo-600 hover:text-indigo-800 font-bold hover:underline flex items-center gap-1 break-all"
+                  >
+                    <span>{event.organiserUrl}</span>
+                    <ExternalLink className="w-3.5 h-3.5 shrink-0" />
+                  </a>
+                </div>
+              )}
             </div>
           </div>
+
+          {/* Organiser Reference Webpage Button (If Available) */}
+          {event.organiserUrl && (
+            <div>
+              <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">
+                Laman Rasmi & Rujukan Penganjur
+              </h3>
+              <a
+                href={event.organiserUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-between p-3.5 rounded-2xl bg-indigo-50/80 hover:bg-indigo-100 border border-indigo-200/90 text-indigo-950 transition-all group shadow-2xs"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-xs group-hover:scale-105 transition-transform">
+                    <Globe className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="font-extrabold text-xs text-indigo-950 flex items-center gap-1.5">
+                      <span>Buka Laman Web / Portal Penganjur</span>
+                      <ExternalLink className="w-3.5 h-3.5 text-indigo-600 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                    </div>
+                    <p className="text-[11px] text-indigo-700 font-medium truncate mt-0.5">
+                      {event.organiserUrl}
+                    </p>
+                  </div>
+                </div>
+                <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white text-indigo-700 text-[11px] font-bold border border-indigo-200 shadow-2xs shrink-0 ml-2">
+                  Layari Laman Web
+                </span>
+              </a>
+            </div>
+          )}
 
           {/* Calendar Sync Options */}
           <div>
@@ -485,7 +532,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
               className="flex-1 bg-slate-900 hover:bg-slate-800 text-white py-2.5 px-5 rounded-xl text-xs sm:text-sm font-extrabold shadow-md transition-all flex items-center justify-center gap-2"
             >
               <CalendarPlus className="w-4 h-4 text-emerald-400" />
-              <span>Simpan ke Google Calendar (Acara Terbuka)</span>
+              <span>Simpan ke Google Calendar</span>
             </a>
           ) : isRegistrationAvailable ? (
             event.registrationMode === 'google_form' && event.registrationUrl ? (

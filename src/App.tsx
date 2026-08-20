@@ -387,6 +387,8 @@ export default function App() {
               onSelectTab={setCurrentTab}
               openCount={openRegistrationCount}
               urgentCount={urgentCount}
+              selectedCategory={selectedCategory}
+              onSelectCategory={setSelectedCategory}
             />
 
             {/* Split Grid Layout: Main Event Feed + Side Navigator */}
@@ -401,9 +403,6 @@ export default function App() {
                     <h2 className="text-xs font-extrabold uppercase tracking-[0.2em] text-slate-400">
                       AKAN DATANG DI KPMBP
                     </h2>
-                    <p className="text-base font-extrabold text-slate-800">
-                      Temui Acara & Activity Terkini
-                    </p>
                   </div>
 
                   {/* Category Quick Selector */}
@@ -462,11 +461,9 @@ export default function App() {
 
               </section>
 
-              {/* Sidebar Column: JANGAN TERLEPAS & Categories */}
+              {/* Sidebar Column: JANGAN TERLEPAS */}
               <DontMissSidebar
                 events={events}
-                selectedCategory={selectedCategory}
-                onSelectCategory={setSelectedCategory}
                 onViewDetails={handleOpenDetailModal}
                 onSelectTab={setCurrentTab}
               />

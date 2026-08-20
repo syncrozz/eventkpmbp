@@ -67,6 +67,7 @@ CREATE TABLE IF NOT EXISTS public.events (
   "eventMode" TEXT DEFAULT 'physical',
   "registrationMode" TEXT DEFAULT 'none',
   "organiserWhatsApp" TEXT,
+  "organiserUrl" TEXT,
   "submissionDeadline" TEXT,
   "registrationUrl" TEXT,
   "registrationDeadline" TEXT,

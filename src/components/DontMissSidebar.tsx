@@ -1,20 +1,16 @@
 import React from 'react';
-import { KpmbpEvent, EventCategory, ViewTab } from '../types';
-import { getTimeRemainingMalay, formatDateMalay, sortEventsByNearestDue, getCategoryButtonClass, getCategoryBadgeClass, getDynamicEventStatus, isEventArchived } from '../utils/calendar';
-import { Flame, Calendar, ArrowRight, Filter, AlertOctagon, Clock } from 'lucide-react';
+import { KpmbpEvent, ViewTab } from '../types';
+import { getTimeRemainingMalay, formatDateMalay, sortEventsByNearestDue, getDynamicEventStatus, isEventArchived } from '../utils/calendar';
+import { Flame, ArrowRight, Clock } from 'lucide-react';
 
 interface DontMissSidebarProps {
   events: KpmbpEvent[];
-  selectedCategory: EventCategory;
-  onSelectCategory: (cat: EventCategory) => void;
   onViewDetails: (event: KpmbpEvent) => void;
   onSelectTab: (tab: ViewTab) => void;
 }
 
 export const DontMissSidebar: React.FC<DontMissSidebarProps> = ({
   events,
-  selectedCategory,
-  onSelectCategory,
   onViewDetails,
   onSelectTab
 }) => {
@@ -40,27 +36,14 @@ export const DontMissSidebar: React.FC<DontMissSidebarProps> = ({
     return { label: 'AKAN DATANG', color: 'bg-indigo-100 text-indigo-800 border-indigo-200' };
   };
 
-  const categories: EventCategory[] = [
-    'Semua',
-    'Pertandingan',
-    'Bengkel',
-    'Program Pelajar',
-    'Kelab & Persatuan',
-    'Akademik',
-    'Kebudayaan',
-    'Sukan',
-    'Kerjaya',
-    'Institusi'
-  ];
-
   return (
     <aside className="w-full lg:w-80 flex flex-col gap-6 shrink-0">
       
       {/* JANGAN TERLEPAS Section */}
-      <div className="bg-white/60 backdrop-blur-xl border border-white/80 p-5 rounded-2xl shadow-2xs space-y-4">
+      <div className="bg-white/60 backdrop-blur-xl border border-white/80 p-5 rounded-3xl shadow-sm space-y-4">
         <div className="flex items-center justify-between border-b border-slate-100 pb-3">
           <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-lg bg-rose-500 text-white shadow-xs">
+            <div className="p-1.5 rounded-xl bg-rose-500 text-white shadow-xs">
               <Flame className="w-4 h-4 animate-bounce" />
             </div>
             <div>
@@ -123,56 +106,6 @@ export const DontMissSidebar: React.FC<DontMissSidebarProps> = ({
             })}
           </div>
         )}
-      </div>
-
-      {/* CATEGORY NAVIGATOR */}
-      <div className="bg-white/60 backdrop-blur-xl border border-white/80 p-5 rounded-2xl shadow-2xs">
-        <div className="flex items-center gap-2 mb-3">
-          <Filter className="w-4 h-4 text-indigo-600" />
-          <h2 className="text-xs font-black uppercase tracking-wider text-slate-900">
-            KATEGORI EVENT
-          </h2>
-        </div>
-
-        <div className="flex flex-wrap gap-1.5">
-          {categories.map((cat) => {
-            const isSelected = selectedCategory === cat;
-            return (
-              <button
-                key={cat}
-                onClick={() => onSelectCategory(cat)}
-                className={`px-3 py-1.5 rounded-xl text-xs whitespace-nowrap transition-all ${getCategoryButtonClass(
-                  cat,
-                  isSelected
-                )}`}
-              >
-                {cat}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* CALENDAR BANNER CARD */}
-      <div className="bg-gradient-to-br from-indigo-900 to-slate-900 rounded-2xl p-5 text-white shadow-md relative overflow-hidden">
-        <div className="absolute top-[-20px] right-[-20px] w-24 h-24 bg-indigo-500/20 rounded-full blur-xl pointer-events-none" />
-        <p className="text-[10px] font-bold opacity-70 uppercase tracking-wider mb-1">
-          PANDANGAN JADUAL
-        </p>
-        <h3 className="text-base font-extrabold mb-1">
-          Format Kalendar Bulanan
-        </h3>
-        <p className="text-xs text-slate-300 mb-4 leading-relaxed">
-          Semak tarikh dan susunan program mengikut hari dan minggu.
-        </p>
-
-        <button
-          onClick={() => onSelectTab('calendar')}
-          className="w-full bg-white/10 hover:bg-white/20 border border-white/20 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 backdrop-blur-sm"
-        >
-          <Calendar className="w-4 h-4 text-indigo-300" />
-          <span>Buka Kalendar Event</span>
-        </button>
       </div>
 
     </aside>

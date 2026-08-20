@@ -40,6 +40,7 @@ export interface KpmbpEvent {
   eventMode?: EventMode; // 'physical' | 'online' (default fallback: physical)
   registrationMode?: RegistrationMode; // 'admin' | 'google_form' (default fallback: google_form if registrationUrl exists, else admin)
   organiserWhatsApp?: string; // Contact phone / WhatsApp number for admin registration
+  organiserUrl?: string; // Official webpage / reference website from organiser
   submissionDeadline?: string; // ISO datetime YYYY-MM-DDTHH:mm for online competitions / submissions
   registrationUrl?: string;
   registrationDeadline?: string; // ISO datetime YYYY-MM-DDTHH:mm
