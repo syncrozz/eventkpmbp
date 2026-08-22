@@ -10,10 +10,16 @@ import { SUPABASE_SQL_SETUP, isSupabaseConfigured, checkSupabaseHealth } from '.
 import { formatDateDMY, formatDeadlineMalay, getCategoryBadgeClass, isOngoingProgram } from '../utils/calendar';
 import { optimizeEventImage } from '../utils/imageOptimizer';
 import { 
+  exportEventsToCSV, 
+  exportRegistrationsToCSV, 
+  downloadEventsTemplateCSV, 
+  parseEventsFromCSV 
+} from '../utils/csvHelper';
+import { 
   Plus, Trash2, Edit2, ShieldCheck, Check, Sparkles, AlertCircle, 
   Image as ImageIcon, Upload, Link as LinkIcon, X, Eye, Cloud, Users, 
   Search, Phone, Mail, Calendar, Download, RefreshCw, Loader2, Database, Copy, CheckCheck, WifiOff, Globe, ExternalLink,
-  Repeat, Clock, Layers
+  Repeat, Clock, Layers, FileSpreadsheet, FileUp, FileDown, CheckCircle2, FileText, ArrowUpDown, HelpCircle
 } from 'lucide-react';
 
 interface AdminPortalProps {
@@ -24,6 +30,7 @@ interface AdminPortalProps {
   initialEditingEvent?: KpmbpEvent | null;
   onClearInitialEditingEvent?: () => void;
   onSeedSampleData?: () => void;
+  onBulkImportEvents?: (events: KpmbpEvent[], replaceAll: boolean) => Promise<void>;
 }
 
 export const AdminPortal: React.FC<AdminPortalProps> = ({
@@ -33,7 +40,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   onDeleteEvent,
   initialEditingEvent,
   onClearInitialEditingEvent,
-  onSeedSampleData
+  onSeedSampleData,
+  onBulkImportEvents
 }) => {
   const [activeAdminTab, setActiveAdminTab] = useState<'events' | 'registrations'>('events');
   const [registrations, setRegistrations] = useState<RegistrationRecord[]>([]);
@@ -49,6 +57,94 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
   const [editingEvent, setEditingEvent] = useState<KpmbpEvent | null>(null);
   const [isCreating, setIsCreating] = useState(false);
+
+  // CSV Import State
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importedPreviewEvents, setImportedPreviewEvents] = useState<KpmbpEvent[]>([]);
+  const [importErrors, setImportErrors] = useState<string[]>([]);
+  const [importFileName, setImportFileName] = useState('');
+  const [importMode, setImportMode] = useState<'merge' | 'replace'>('merge');
+  const [isImporting, setIsImporting] = useState(false);
+  const csvFileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleExportEventsCSV = () => {
+    if (events.length === 0) {
+      alert('Tiada acara untuk dieksport.');
+      return;
+    }
+    exportEventsToCSV(events);
+  };
+
+  const handleExportRegistrationsCSV = () => {
+    if (registrations.length === 0) {
+      alert('Tiada rekod pendaftaran untuk dieksport.');
+      return;
+    }
+    exportRegistrationsToCSV(registrations, events);
+  };
+
+  const handleDownloadTemplate = () => {
+    downloadEventsTemplateCSV();
+  };
+
+  const handleCsvFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImportFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result as string;
+      if (!text) {
+        alert('Fail CSV kosong atau tidak dapat dibaca.');
+        return;
+      }
+      const result = parseEventsFromCSV(text);
+      if (!result.success || result.events.length === 0) {
+        alert(`Gagal memproses fail CSV:\n${result.errors.join('\n')}`);
+        return;
+      }
+
+      setImportedPreviewEvents(result.events);
+      setImportErrors(result.errors);
+      setImportMode('merge');
+      setIsImportModalOpen(true);
+    };
+
+    reader.onerror = () => {
+      alert('Ralat semasa membaca fail CSV.');
+    };
+
+    reader.readAsText(file, 'UTF-8');
+    // Reset file input so selecting the same file triggers onChange again
+    e.target.value = '';
+  };
+
+  const handleExecuteImport = async () => {
+    if (importedPreviewEvents.length === 0) return;
+    setIsImporting(true);
+    try {
+      if (onBulkImportEvents) {
+        await onBulkImportEvents(importedPreviewEvents, importMode === 'replace');
+      } else {
+        for (const evt of importedPreviewEvents) {
+          const exists = events.some((e) => e.id === evt.id);
+          if (exists) {
+            onUpdateEvent(evt);
+          } else {
+            onCreateEvent(evt);
+          }
+        }
+      }
+      setIsImportModalOpen(false);
+      setImportedPreviewEvents([]);
+    } catch (err: any) {
+      console.error('Import error:', err);
+      alert('Ralat semasa import data: ' + (err?.message || 'Sila cuba lagi.'));
+    } finally {
+      setIsImporting(false);
+    }
+  };
 
   // Check live Supabase connection status on mount
   useEffect(() => {
@@ -409,6 +505,68 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
         {!isCreating && !editingEvent && (
           <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
+            {/* Hidden CSV File Input */}
+            <input
+              ref={csvFileInputRef}
+              type="file"
+              accept=".csv,text/csv"
+              className="hidden"
+              onChange={handleCsvFileSelect}
+            />
+
+            {/* CSV Export & Import Action Buttons for Events */}
+            {activeAdminTab === 'events' && (
+              <div className="flex items-center gap-1.5 bg-slate-100/90 p-1 rounded-2xl border border-slate-200/80">
+                <button
+                  type="button"
+                  onClick={handleExportEventsCSV}
+                  className="bg-white hover:bg-slate-50 text-slate-800 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-2xs border border-slate-200/80 cursor-pointer"
+                  title="Eksport sandaran semua acara KPMBP ke fail CSV / Excel"
+                >
+                  <FileDown className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>Eksport CSV</span>
+                  <span className="bg-indigo-50 text-indigo-700 text-[10px] px-1.5 py-0.2 rounded font-extrabold">
+                    {events.length}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => csvFileInputRef.current?.click()}
+                  className="bg-indigo-50 hover:bg-indigo-100 text-indigo-800 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all border border-indigo-200/80 cursor-pointer"
+                  title="Import acara atau pulihkan sandaran daripada fail CSV"
+                >
+                  <FileUp className="w-3.5 h-3.5 text-indigo-700" />
+                  <span>Import CSV</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleDownloadTemplate}
+                  className="text-slate-500 hover:text-slate-800 p-1.5 rounded-xl text-xs transition-colors hover:bg-slate-200/60"
+                  title="Muat turun templat format CSV kosong (Contoh)"
+                >
+                  <HelpCircle className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+
+            {/* CSV Export for Registrations Tab */}
+            {activeAdminTab === 'registrations' && (
+              <button
+                type="button"
+                onClick={handleExportRegistrationsCSV}
+                className="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all border border-emerald-200/80 cursor-pointer shadow-2xs"
+                title="Eksport senarai pendaftaran pelajar ke fail CSV / Excel"
+              >
+                <FileDown className="w-3.5 h-3.5 text-emerald-700" />
+                <span>Eksport Pendaftaran (CSV)</span>
+                <span className="bg-emerald-200/80 text-emerald-900 text-[10px] px-1.5 py-0.2 rounded font-extrabold">
+                  {registrations.length}
+                </span>
+              </button>
+            )}
+
             {onSeedSampleData && (
               <button
                 type="button"
@@ -1570,6 +1728,286 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
               </table>
             </div>
           )}
+        </div>
+      )}
+
+      {/* CSV Import & Restore Confirmation Modal */}
+      {isImportModalOpen && (
+        <div 
+          className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto"
+          onClick={() => {
+            if (!isImporting) {
+              setIsImportModalOpen(false);
+              setImportedPreviewEvents([]);
+            }
+          }}
+        >
+          <div 
+            className="bg-white border border-slate-200 rounded-3xl max-w-3xl w-full shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 my-8 max-h-[90vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-5 flex items-center justify-between border-b border-indigo-900/50">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-indigo-500/20 border border-indigo-400/30 text-indigo-300 flex items-center justify-center shadow-inner">
+                  <FileSpreadsheet className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold flex items-center gap-2">
+                    <span>Import Acara CSV & Pulihkan Data</span>
+                  </h3>
+                  <p className="text-xs text-indigo-200/80">
+                    Fail: <span className="font-mono text-white font-semibold">{importFileName || 'fail.csv'}</span> • {importedPreviewEvents.length} Acara Dikesan
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                disabled={isImporting}
+                onClick={() => {
+                  setIsImportModalOpen(false);
+                  setImportedPreviewEvents([]);
+                }}
+                className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-slate-300 transition-colors disabled:opacity-50"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 overflow-y-auto space-y-5 text-xs flex-1">
+              {/* Summary Badges */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="bg-indigo-50/70 border border-indigo-100 rounded-2xl p-3 flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-black text-xs shrink-0">
+                    {importedPreviewEvents.length}
+                  </div>
+                  <div>
+                    <div className="text-[10px] text-slate-500 uppercase font-bold">Jumlah Acara</div>
+                    <div className="text-xs font-black text-indigo-950">Ditemui dalam fail</div>
+                  </div>
+                </div>
+
+                <div className="bg-amber-50/70 border border-amber-100 rounded-2xl p-3 flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-xl bg-amber-600 text-white flex items-center justify-center font-black text-xs shrink-0">
+                    {importedPreviewEvents.filter((e) => e.eventType !== 'ONGOING_PROGRAM').length}
+                  </div>
+                  <div>
+                    <div className="text-[10px] text-slate-500 uppercase font-bold">Acara Sekali</div>
+                    <div className="text-xs font-black text-amber-950">Fizikal / Online</div>
+                  </div>
+                </div>
+
+                <div className="bg-emerald-50/70 border border-emerald-100 rounded-2xl p-3 flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-black text-xs shrink-0">
+                    {importedPreviewEvents.filter((e) => e.eventType === 'ONGOING_PROGRAM').length}
+                  </div>
+                  <div>
+                    <div className="text-[10px] text-slate-500 uppercase font-bold">Program Berterusan</div>
+                    <div className="text-xs font-black text-emerald-950">Jadual Berkala</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Mode Selection */}
+              <div className="space-y-2">
+                <label className="text-xs font-extrabold text-slate-900 block">
+                  Pilih Kaedah Import:
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Option 1: Merge & Update */}
+                  <label
+                    onClick={() => setImportMode('merge')}
+                    className={`p-3.5 rounded-2xl border-2 cursor-pointer transition-all flex items-start gap-3 ${
+                      importMode === 'merge'
+                        ? 'border-indigo-600 bg-indigo-50/40 shadow-sm'
+                        : 'border-slate-200 hover:border-slate-300 bg-white'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="import_mode"
+                      value="merge"
+                      checked={importMode === 'merge'}
+                      onChange={() => setImportMode('merge')}
+                      className="mt-0.5 text-indigo-600 focus:ring-indigo-500"
+                    />
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-1.5 font-black text-slate-900 text-xs">
+                        <span>Gabung & Kemas Kini</span>
+                        <span className="text-[9px] bg-emerald-100 text-emerald-800 font-extrabold px-1.5 py-0.2 rounded-full">
+                          Disyorkan
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 leading-relaxed">
+                        Mengemas kini acara jika ID sama wujud dan menambah acara baharu. Acara sedia ada lain kekal terpelihara.
+                      </p>
+                    </div>
+                  </label>
+
+                  {/* Option 2: Replace All */}
+                  <label
+                    onClick={() => setImportMode('replace')}
+                    className={`p-3.5 rounded-2xl border-2 cursor-pointer transition-all flex items-start gap-3 ${
+                      importMode === 'replace'
+                        ? 'border-rose-500 bg-rose-50/40 shadow-sm'
+                        : 'border-slate-200 hover:border-slate-300 bg-white'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="import_mode"
+                      value="replace"
+                      checked={importMode === 'replace'}
+                      onChange={() => setImportMode('replace')}
+                      className="mt-0.5 text-rose-600 focus:ring-rose-500"
+                    />
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-1.5 font-black text-slate-900 text-xs">
+                        <span>Gantikan Semua (Pulih Sandaran)</span>
+                        <span className="text-[9px] bg-rose-100 text-rose-800 font-extrabold px-1.5 py-0.2 rounded-full">
+                          Restore Penuh
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 leading-relaxed">
+                        Menggantikan senarai acara sekarang dengan data CSV ini sepenuhnya. Sangat berguna sekiranya data ter-overwrite.
+                      </p>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              {/* Any Errors / Warnings */}
+              {importErrors.length > 0 && (
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3.5 text-amber-900 space-y-1">
+                  <div className="flex items-center gap-1.5 font-bold text-xs text-amber-800">
+                    <AlertCircle className="w-4 h-4 text-amber-600" />
+                    <span>Peringatan Format CSV:</span>
+                  </div>
+                  <ul className="list-disc list-inside space-y-0.5 text-[11px] text-amber-800">
+                    {importErrors.map((err, idx) => (
+                      <li key={idx}>{err}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Preview Table */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-700">
+                    Pratonton Senarai Acara ({importedPreviewEvents.length}):
+                  </span>
+                  <span className="text-[10px] text-slate-400">
+                    Data akan disegerakkan terus ke Awan (Firebase/Supabase).
+                  </span>
+                </div>
+
+                <div className="border border-slate-200 rounded-2xl overflow-hidden overflow-x-auto max-h-[260px]">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead className="bg-slate-50 sticky top-0 z-10">
+                      <tr className="border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider text-[9px]">
+                        <th className="py-2.5 px-3">Tajuk Acara</th>
+                        <th className="py-2.5 px-2">Jenis</th>
+                        <th className="py-2.5 px-2">Kategori</th>
+                        <th className="py-2.5 px-2">Tarikh / Jadual</th>
+                        <th className="py-2.5 px-2">Penganjur</th>
+                        <th className="py-2.5 px-2">Mod Pendaftaran</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 font-medium">
+                      {importedPreviewEvents.map((evt, index) => (
+                        <tr key={evt.id || index} className="hover:bg-slate-50/80">
+                          <td className="py-2 px-3 font-bold text-slate-900 max-w-[200px] truncate">
+                            {evt.title}
+                          </td>
+                          <td className="py-2 px-2 whitespace-nowrap">
+                            {evt.eventType === 'ONGOING_PROGRAM' ? (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-emerald-100 text-emerald-800">
+                                Program Berterusan
+                              </span>
+                            ) : (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-indigo-100 text-indigo-800">
+                                Acara Sekali
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-2 px-2 whitespace-nowrap">
+                            <span className={`px-2 py-0.5 rounded text-[9px] font-extrabold ${getCategoryBadgeClass(evt.category)}`}>
+                              {evt.category}
+                            </span>
+                          </td>
+                          <td className="py-2 px-2 text-slate-600 text-[11px] whitespace-nowrap">
+                            {evt.eventType === 'ONGOING_PROGRAM'
+                              ? (evt.scheduleSummary || 'Jadual Berkala')
+                              : (evt.date || '-')}
+                          </td>
+                          <td className="py-2 px-2 text-slate-600 text-[11px] max-w-[140px] truncate">
+                            {evt.organiser}
+                          </td>
+                          <td className="py-2 px-2 whitespace-nowrap">
+                            <span className="px-1.5 py-0.5 bg-slate-100 text-slate-700 rounded text-[9px] font-semibold">
+                              {evt.registrationMode === 'admin'
+                                ? 'WhatsApp Admin'
+                                : evt.registrationMode === 'google_form'
+                                ? 'Form Rasmi Penganjur'
+                                : 'Tiada Pendaftaran'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="text-[11px] text-slate-500">
+                Penyegerakan awan akan memastikan semua peranti (PC & Telefon) menerima data terkini.
+              </div>
+              <div className="flex items-center gap-2 justify-end">
+                <button
+                  type="button"
+                  disabled={isImporting}
+                  onClick={() => {
+                    setIsImportModalOpen(false);
+                    setImportedPreviewEvents([]);
+                  }}
+                  className="px-4 py-2 text-slate-700 hover:bg-slate-200/70 rounded-xl text-xs font-bold transition-colors disabled:opacity-50"
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  disabled={isImporting || importedPreviewEvents.length === 0}
+                  onClick={handleExecuteImport}
+                  className={`px-5 py-2 rounded-xl text-xs font-black text-white shadow-md flex items-center gap-2 transition-all cursor-pointer ${
+                    importMode === 'replace'
+                      ? 'bg-rose-600 hover:bg-rose-700 shadow-rose-200'
+                      : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200'
+                  } disabled:opacity-50`}
+                >
+                  {isImporting ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Mengimport & Menyegerak...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4" />
+                      <span>
+                        {importMode === 'replace'
+                          ? `Gantikan & Pulihkan (${importedPreviewEvents.length} Acara)`
+                          : `Sahkan & Import (${importedPreviewEvents.length} Acara)`}
+                      </span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

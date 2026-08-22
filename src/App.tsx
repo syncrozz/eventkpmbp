@@ -19,6 +19,7 @@ import {
   deleteExistingEvent,
   saveNewRegistration,
   resetAndSeedDemoEvents,
+  bulkImportEvents,
   getActiveBackendLabel,
   getActiveBackendType
 } from './services/dbAdapter';
@@ -337,6 +338,26 @@ export default function App() {
     }
   };
 
+  const handleBulkImportEvents = async (importedEvents: KpmbpEvent[], replaceAll: boolean) => {
+    try {
+      if (replaceAll) {
+        setEvents(importedEvents);
+      } else {
+        setEvents((prev) => {
+          const map = new Map<string, KpmbpEvent>();
+          prev.forEach((e) => map.set(e.id, e));
+          importedEvents.forEach((e) => map.set(e.id, e));
+          return Array.from(map.values());
+        });
+      }
+      await bulkImportEvents(importedEvents, replaceAll);
+      showToast(`Berjaya mengimport ${importedEvents.length} acara ke dalam sistem!`);
+    } catch (err: any) {
+      console.error('Error importing events:', err);
+      showToast('Ralat semasa mengimport acara ke pangkalan data.');
+    }
+  };
+
   const handleRegistrationSuccess = async (record: RegistrationRecord) => {
     try {
       await saveNewRegistration(record);
@@ -593,6 +614,7 @@ export default function App() {
                 initialEditingEvent={editingEventInAdmin}
                 onClearInitialEditingEvent={() => setEditingEventInAdmin(null)}
                 onSeedSampleData={handleSeedSampleData}
+                onBulkImportEvents={handleBulkImportEvents}
               />
             ) : (
               <div className="max-w-md mx-auto my-12 bg-white/80 backdrop-blur-xl border border-slate-200/80 rounded-3xl p-8 text-center space-y-5 shadow-xl">

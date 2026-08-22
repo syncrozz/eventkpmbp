@@ -166,6 +166,51 @@ export async function resetAndSeedDemoEvents(): Promise<void> {
 }
 
 /**
+ * Bulk imports events into active backend & local cache
+ */
+export async function bulkImportEvents(
+  importedEvents: KpmbpEvent[],
+  replaceAll: boolean = false
+): Promise<{ success: boolean; count: number }> {
+  const backend = getActiveBackendType();
+  const currentCache = getLocalEventsCache();
+
+  let nextEvents: KpmbpEvent[];
+  if (replaceAll) {
+    nextEvents = [...importedEvents];
+  } else {
+    const map = new Map<string, KpmbpEvent>();
+    currentCache.forEach((e) => map.set(e.id, e));
+    importedEvents.forEach((e) => map.set(e.id, e));
+    nextEvents = Array.from(map.values());
+  }
+
+  saveLocalEventsCache(nextEvents);
+
+  if (backend === 'firebase') {
+    try {
+      for (const evt of importedEvents) {
+        await updateEventInFirestore(evt);
+      }
+    } catch (err) {
+      console.warn('Firebase bulk import notice:', err);
+    }
+  } else if (backend === 'supabase') {
+    try {
+      for (const evt of importedEvents) {
+        await updateEventInSupabase(evt.id, evt).catch(async () => {
+          await createEventInSupabase(evt);
+        });
+      }
+    } catch (err) {
+      console.warn('Supabase bulk import notice:', err);
+    }
+  }
+
+  return { success: true, count: importedEvents.length };
+}
+
+/**
  * Real-time registrations subscription with multi-backend failover
  */
 export function subscribeToAllRegistrations(
