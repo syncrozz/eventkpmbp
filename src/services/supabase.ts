@@ -7,20 +7,21 @@ const env = (typeof import.meta !== 'undefined' && (import.meta as any)?.env) ||
 const supabaseUrl = 
   env.VITE_SUPABASE_URL || 
   env.NEXT_PUBLIC_SUPABASE_URL || 
-  'https://ivkxayntsrtdlvjsbktt.supabase.co';
+  '';
 
 const supabaseAnonKey = 
   env.VITE_SUPABASE_ANON_KEY || 
   env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || 
   env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 
-  'sb_publishable_dTXrfyQooluNXGDYMC5qGg_WCHrJkjS';
+  '';
 
 export const isSupabaseConfigured = (): boolean => {
   return Boolean(
     supabaseUrl &&
     supabaseAnonKey &&
     supabaseUrl.startsWith('https://') &&
-    supabaseAnonKey.length > 10
+    supabaseAnonKey.length > 20 &&
+    !supabaseUrl.includes('placeholder')
   );
 };
 
@@ -198,6 +199,7 @@ function sanitizeEventForSupabase(event: Partial<KpmbpEvent>): Record<string, an
 function mapRowToEvent(row: any): KpmbpEvent {
   return {
     id: row.id,
+    eventType: row.eventType || row.event_type || 'ONE_TIME_EVENT',
     title: row.title || '',
     description: row.description || '',
     category: row.category || 'Lain-lain',
@@ -221,6 +223,12 @@ function mapRowToEvent(row: any): KpmbpEvent {
     seatsLeft: row.seatsLeft !== null && row.seatsLeft !== undefined ? Number(row.seatsLeft) : undefined,
     totalSeats: row.totalSeats !== null && row.totalSeats !== undefined ? Number(row.totalSeats) : undefined,
     tags: Array.isArray(row.tags) ? row.tags : [],
+    programDuration: row.programDuration || row.program_duration || undefined,
+    scheduleSummary: row.scheduleSummary || row.schedule_summary || undefined,
+    scheduleSessions: Array.isArray(row.scheduleSessions || row.schedule_sessions) ? (row.scheduleSessions || row.schedule_sessions) : undefined,
+    feeType: row.feeType || row.fee_type || undefined,
+    feeAmount: row.feeAmount || row.fee_amount || undefined,
+    targetAudience: row.targetAudience || row.target_audience || undefined,
     createdAt: row.createdAt || row.created_at || undefined,
     updatedAt: row.updatedAt || row.updated_at || undefined,
   };

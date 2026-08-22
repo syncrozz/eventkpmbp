@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { KpmbpEvent, EventCategory, EventStatus, RegistrationRecord, RegistrationMode } from '../types';
+import { KpmbpEvent, EventCategory, EventStatus, RegistrationRecord, RegistrationMode, EventType, ProgramSession } from '../types';
 import { 
   subscribeToAllRegistrations, 
   deleteExistingRegistration, 
@@ -7,12 +7,13 @@ import {
   getActiveBackendType 
 } from '../services/dbAdapter';
 import { SUPABASE_SQL_SETUP, isSupabaseConfigured, checkSupabaseHealth } from '../services/supabase';
-import { formatDateDMY, formatDeadlineMalay, getCategoryBadgeClass } from '../utils/calendar';
+import { formatDateDMY, formatDeadlineMalay, getCategoryBadgeClass, isOngoingProgram } from '../utils/calendar';
 import { optimizeEventImage } from '../utils/imageOptimizer';
 import { 
   Plus, Trash2, Edit2, ShieldCheck, Check, Sparkles, AlertCircle, 
   Image as ImageIcon, Upload, Link as LinkIcon, X, Eye, Cloud, Users, 
-  Search, Phone, Mail, Calendar, Download, RefreshCw, Loader2, Database, Copy, CheckCheck, WifiOff, Globe, ExternalLink
+  Search, Phone, Mail, Calendar, Download, RefreshCw, Loader2, Database, Copy, CheckCheck, WifiOff, Globe, ExternalLink,
+  Repeat, Clock, Layers
 } from 'lucide-react';
 
 interface AdminPortalProps {
@@ -87,6 +88,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   }, []);
 
   // Form State
+  const [eventType, setEventType] = useState<EventType>('ONE_TIME_EVENT');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState<Exclude<EventCategory, 'Semua'>>('Pertandingan');
@@ -110,6 +112,14 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const [contact, setContact] = useState('Urusetia KPMBP - 012-3456789');
   const [organiserUrl, setOrganiserUrl] = useState('');
 
+  // Ongoing Program State Fields
+  const [scheduleSummary, setScheduleSummary] = useState('');
+  const [scheduleSessions, setScheduleSessions] = useState<ProgramSession[]>([]);
+  const [programDuration, setProgramDuration] = useState('');
+  const [feeType, setFeeType] = useState<'free' | 'paid' | 'voluntary'>('free');
+  const [feeAmount, setFeeAmount] = useState('');
+  const [targetAudience, setTargetAudience] = useState('');
+
   const [isCompressingImage, setIsCompressingImage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -118,40 +128,75 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     'Akademik', 'Kebudayaan', 'Sukan', 'Kerjaya', 'Institusi', 'Lain-lain'
   ];
 
-  const handleStartCreate = () => {
+  const handleAddSession = () => {
+    setScheduleSessions((prev) => [
+      ...prev,
+      {
+        id: Math.random().toString(36).substring(2, 9),
+        day: 'Isnin',
+        time: '08:30 PM - 09:30 PM',
+        mode: 'online',
+        activity: '',
+        location: ''
+      }
+    ]);
+  };
+
+  const handleUpdateSession = (index: number, field: keyof ProgramSession, val: any) => {
+    setScheduleSessions((prev) => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: val };
+      return updated;
+    });
+  };
+
+  const handleRemoveSession = (index: number) => {
+    setScheduleSessions((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleStartCreate = (defaultType: EventType = 'ONE_TIME_EVENT') => {
     setIsCreating(true);
     setEditingEvent(null);
+    setEventType(defaultType);
     setTitle('');
     setDescription('');
-    setCategory('Program Pelajar');
+    setCategory(defaultType === 'ONGOING_PROGRAM' ? 'Program Pelajar' : 'Pertandingan');
     setEventMode('physical');
     setDate('2026-09-01');
     setStartTime('09:00 AM');
     setEndTime('01:00 PM');
     setSubmissionDeadline('2026-09-01T23:59');
-    setLocation('Kampus KPMBP');
+    setLocation(defaultType === 'ONGOING_PROGRAM' ? 'Bilik Seminar & Atas Talian' : 'Kampus KPMBP');
     setOrganiser('Urusetia KPMBP');
     setImage('');
-    setRegistrationMode('none');
+    setRegistrationMode(defaultType === 'ONGOING_PROGRAM' ? 'admin' : 'none');
     setOrganiserWhatsApp('');
     setRegistrationUrl('');
     setRegistrationDeadline('');
-    setStatus('Upcoming');
+    setStatus(defaultType === 'ONGOING_PROGRAM' ? 'Registration Open' : 'Upcoming');
     setSeatsLeft('');
     setTotalSeats('');
     setEligibility('Terbuka kepada semua warga KPMBP');
     setContact('Urusetia KPMBP - 012-3456789');
     setOrganiserUrl('');
+    // Reset ongoing fields
+    setScheduleSummary('');
+    setScheduleSessions([]);
+    setProgramDuration('');
+    setFeeType('free');
+    setFeeAmount('');
+    setTargetAudience('');
   };
 
   const handleStartEdit = (evt: KpmbpEvent) => {
     setEditingEvent(evt);
     setIsCreating(false);
+    setEventType(evt.eventType || 'ONE_TIME_EVENT');
     setTitle(evt.title);
     setDescription(evt.description);
     setCategory(evt.category);
     setEventMode(evt.eventMode || 'physical');
-    setDate(evt.date);
+    setDate(evt.date || '');
     setStartTime(evt.startTime || '09:00 AM');
     setEndTime(evt.endTime || '05:00 PM');
     setSubmissionDeadline(evt.submissionDeadline || (evt.date ? `${evt.date}T23:59` : '2026-09-01T23:59'));
@@ -168,6 +213,13 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     setEligibility(evt.eligibility);
     setContact(evt.contact);
     setOrganiserUrl(evt.organiserUrl || '');
+    // Ongoing program fields
+    setScheduleSummary(evt.scheduleSummary || '');
+    setScheduleSessions(evt.scheduleSessions ? JSON.parse(JSON.stringify(evt.scheduleSessions)) : []);
+    setProgramDuration(evt.programDuration || '');
+    setFeeType(evt.feeType || 'free');
+    setFeeAmount(evt.feeAmount || '');
+    setTargetAudience(evt.targetAudience || '');
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -198,20 +250,22 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     e.preventDefault();
     if (!title || !description || !organiser) return;
 
-    // Validation rules based on Mode
-    if (eventMode === 'physical') {
-      if (!location.trim()) {
-        alert('Sila masukkan Lokasi Kampus untuk acara fizikal.');
-        return;
-      }
-      if (!startTime.trim() || !endTime.trim()) {
-        alert('Sila masukkan Masa Mula dan Masa Tamat untuk acara fizikal.');
-        return;
-      }
-    } else {
-      if (!submissionDeadline) {
-        alert('Sila tetapkan Waktu Due / Tarikh & Masa Akhir Submission untuk acara online.');
-        return;
+    // Validation rules based on Event Type and Mode
+    if (eventType === 'ONE_TIME_EVENT') {
+      if (eventMode === 'physical') {
+        if (!location.trim()) {
+          alert('Sila masukkan Lokasi Kampus untuk acara fizikal.');
+          return;
+        }
+        if (!startTime.trim() || !endTime.trim()) {
+          alert('Sila masukkan Masa Mula dan Masa Tamat untuk acara fizikal.');
+          return;
+        }
+      } else {
+        if (!submissionDeadline) {
+          alert('Sila tetapkan Waktu Due / Tarikh & Masa Akhir Submission untuk acara online.');
+          return;
+        }
       }
     }
 
@@ -228,29 +282,37 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     }
 
     const finalEventPayload: Omit<KpmbpEvent, 'id'> = {
+      eventType,
       title,
       description,
       category,
-      date,
-      startTime: eventMode === 'physical' ? startTime : '',
-      endTime: eventMode === 'physical' ? endTime : '',
-      location: eventMode === 'physical' ? location : '',
+      date: eventType === 'ONE_TIME_EVENT' ? date : (date || undefined),
+      startTime: eventType === 'ONE_TIME_EVENT' && eventMode === 'physical' ? startTime : undefined,
+      endTime: eventType === 'ONE_TIME_EVENT' && eventMode === 'physical' ? endTime : undefined,
+      location: location.trim() || (eventType === 'ONGOING_PROGRAM' ? 'KPM Beranang' : ''),
       organiser,
       image: image.trim() || undefined,
-      eventMode,
+      eventMode: eventType === 'ONE_TIME_EVENT' ? eventMode : undefined,
       registrationMode,
       organiserWhatsApp: registrationMode === 'admin' ? organiserWhatsApp.trim() : undefined,
-      submissionDeadline: eventMode === 'online' ? submissionDeadline : undefined,
+      submissionDeadline: eventType === 'ONE_TIME_EVENT' && eventMode === 'online' ? submissionDeadline : undefined,
       registrationUrl: registrationMode === 'google_form' ? registrationUrl.trim() : undefined,
-      registrationDeadline: registrationMode !== 'none'
+      registrationDeadline: eventType === 'ONE_TIME_EVENT' && registrationMode !== 'none'
         ? (registrationDeadline || (eventMode === 'online' ? submissionDeadline : undefined))
-        : undefined,
+        : (registrationDeadline || undefined),
       status,
       seatsLeft: registrationMode !== 'none' && seatsLeft !== '' ? parseInt(seatsLeft, 10) : undefined,
       totalSeats: registrationMode !== 'none' && totalSeats !== '' ? parseInt(totalSeats, 10) : undefined,
       eligibility,
       contact,
-      organiserUrl: organiserUrl.trim() || undefined
+      organiserUrl: organiserUrl.trim() || undefined,
+      // Ongoing program specifics
+      scheduleSummary: eventType === 'ONGOING_PROGRAM' ? scheduleSummary.trim() || undefined : undefined,
+      scheduleSessions: eventType === 'ONGOING_PROGRAM' && scheduleSessions.length > 0 ? scheduleSessions : undefined,
+      programDuration: eventType === 'ONGOING_PROGRAM' ? programDuration.trim() || undefined : undefined,
+      feeType: eventType === 'ONGOING_PROGRAM' ? feeType : undefined,
+      feeAmount: eventType === 'ONGOING_PROGRAM' ? feeAmount.trim() || undefined : undefined,
+      targetAudience: eventType === 'ONGOING_PROGRAM' ? targetAudience.trim() || undefined : undefined
     };
 
     if (editingEvent) {
@@ -269,59 +331,89 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     <div className="space-y-6">
       
       {/* Admin Title Card */}
-      <div className="bg-white/60 backdrop-blur-xl border border-white/80 rounded-3xl p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="flex flex-wrap items-center gap-2 mb-2">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-900 text-white rounded-full text-xs font-bold uppercase tracking-wider">
-              <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              <span>Portal Pentadbir Event</span>
-            </div>
-            
-            {getActiveBackendType() === 'supabase' ? (
-              supabaseHealth.connected ? (
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-300 rounded-full text-[11px] font-bold">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                  <Database className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>Supabase PostgreSQL (Aktif & Live Sync)</span>
-                </div>
-              ) : (
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-rose-50 text-rose-700 border border-rose-300 rounded-full text-[11px] font-bold">
-                  <WifiOff className="w-3.5 h-3.5 text-rose-600" />
-                  <span>Supabase PostgreSQL (Tidak Bersambung)</span>
-                </div>
-              )
-            ) : (
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-full text-[11px] font-bold">
-                <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
-                <Cloud className="w-3.5 h-3.5 text-indigo-600" />
-                <span>Firebase Cloud / Local Mode</span>
-              </div>
-            )}
-
-            <button
-              type="button"
-              onClick={() => setShowSqlModal(true)}
-              className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-full text-[11px] font-bold transition-colors"
-            >
-              <Database className="w-3 h-3 text-slate-500" />
-              <span>Skrip SQL Supabase</span>
-            </button>
+      <div className="bg-white/60 backdrop-blur-xl border border-white/80 rounded-2xl p-4 sm:p-5 shadow-sm">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-900 text-white rounded-full text-xs font-bold uppercase tracking-wider">
+            <ShieldCheck className="w-4 h-4 text-emerald-400" />
+            <span>Portal Pentadbir Event</span>
           </div>
-          <h2 className="text-2xl font-black text-slate-900">
-            Pengurusan & Penerbitan Acara KPMBP
-          </h2>
-          <p className="text-xs text-slate-500 mt-1">
-            Enjin Pangkalan Data Semasa: <strong className="text-slate-800 font-bold">{getActiveBackendLabel()}</strong>
-          </p>
+          
+          {getActiveBackendType() === 'supabase' ? (
+            supabaseHealth.connected ? (
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-300 rounded-full text-[11px] font-bold">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <Database className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Supabase PostgreSQL (Aktif & Live Sync)</span>
+              </div>
+            ) : (
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-rose-50 text-rose-700 border border-rose-300 rounded-full text-[11px] font-bold">
+                <WifiOff className="w-3.5 h-3.5 text-rose-600" />
+                <span>Supabase PostgreSQL (Tidak Bersambung)</span>
+              </div>
+            )
+          ) : (
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-full text-[11px] font-bold">
+              <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
+              <Cloud className="w-3.5 h-3.5 text-indigo-600" />
+              <span>Firebase Cloud / Local Mode</span>
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={() => setShowSqlModal(true)}
+            className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-full text-[11px] font-bold transition-colors cursor-pointer"
+          >
+            <Database className="w-3 h-3 text-slate-500" />
+            <span>Skrip SQL Supabase</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Admin Sub Navigation Tabs & Right-Aligned Action Buttons */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200/80 pb-2">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setActiveAdminTab('events')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all ${
+              activeAdminTab === 'events'
+                ? 'bg-slate-900 text-white shadow-sm'
+                : 'text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            <span>Senarai Acara</span>
+            <span className={`px-2 py-0.5 rounded-full text-[10px] ${
+              activeAdminTab === 'events' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
+            }`}>
+              {events.length}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setActiveAdminTab('registrations')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all ${
+              activeAdminTab === 'registrations'
+                ? 'bg-slate-900 text-white shadow-sm'
+                : 'text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            <Users className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Rekod Pendaftaran Peserta</span>
+            <span className={`px-2 py-0.5 rounded-full text-[10px] ${
+              activeAdminTab === 'registrations' ? 'bg-emerald-500 text-white' : 'bg-emerald-100 text-emerald-800'
+            }`}>
+              {registrations.length}
+            </span>
+          </button>
         </div>
 
         {!isCreating && !editingEvent && (
-          <div className="flex flex-wrap items-center gap-2 self-start md:self-auto">
+          <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
             {onSeedSampleData && (
               <button
                 type="button"
                 onClick={onSeedSampleData}
-                className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3.5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all border border-slate-200/80"
+                className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all border border-slate-200/80 cursor-pointer"
                 title="Muat semula set acara sampel default KPMBP"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
@@ -329,80 +421,95 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
               </button>
             )}
             <button
-              onClick={handleStartCreate}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold shadow-lg shadow-indigo-200 flex items-center gap-2 transition-all"
+              onClick={() => handleStartCreate('ONE_TIME_EVENT')}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold shadow-md shadow-indigo-200 flex items-center gap-1.5 transition-all cursor-pointer"
             >
               <Plus className="w-4 h-4" />
-              <span>Cipta Event Baharu</span>
+              <span>Cipta Acara Sekali</span>
+            </button>
+            <button
+              onClick={() => handleStartCreate('ONGOING_PROGRAM')}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold shadow-md shadow-emerald-200 flex items-center gap-1.5 transition-all cursor-pointer"
+            >
+              <Repeat className="w-4 h-4" />
+              <span>Cipta Program Berterusan</span>
             </button>
           </div>
         )}
-      </div>
-
-      {/* Admin Sub Navigation Tabs */}
-      <div className="flex items-center gap-2 border-b border-slate-200/80 pb-2">
-        <button
-          onClick={() => setActiveAdminTab('events')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all ${
-            activeAdminTab === 'events'
-              ? 'bg-slate-900 text-white shadow-sm'
-              : 'text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          <span>Senarai Acara</span>
-          <span className={`px-2 py-0.5 rounded-full text-[10px] ${
-            activeAdminTab === 'events' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
-          }`}>
-            {events.length}
-          </span>
-        </button>
-
-        <button
-          onClick={() => setActiveAdminTab('registrations')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all ${
-            activeAdminTab === 'registrations'
-              ? 'bg-slate-900 text-white shadow-sm'
-              : 'text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          <Users className="w-3.5 h-3.5 text-emerald-400" />
-          <span>Rekod Pendaftaran Peserta</span>
-          <span className={`px-2 py-0.5 rounded-full text-[10px] ${
-            activeAdminTab === 'registrations' ? 'bg-emerald-500 text-white' : 'bg-emerald-100 text-emerald-800'
-          }`}>
-            {registrations.length}
-          </span>
-        </button>
       </div>
 
       {/* Form (Create/Edit) */}
       {(isCreating || editingEvent) && (
         <form onSubmit={handleSaveForm} className="bg-white/90 backdrop-blur-xl border border-indigo-200 rounded-3xl p-6 shadow-md space-y-4 animate-in fade-in">
           <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-            <h3 className="text-base font-extrabold text-slate-900">
-              {editingEvent ? 'Sunting Event' : 'Borang Cipta Event Baharu'}
-            </h3>
+            <div>
+              <h3 className="text-base font-extrabold text-slate-900">
+                {editingEvent 
+                  ? (eventType === 'ONGOING_PROGRAM' ? 'Sunting Program Berterusan' : 'Sunting Event')
+                  : (eventType === 'ONGOING_PROGRAM' ? 'Borang Cipta Program Berterusan' : 'Borang Cipta Event Baharu')}
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                {eventType === 'ONGOING_PROGRAM' 
+                  ? 'Konfigurasikan program berkala dengan jadual sesi mingguan/harian tanpa kekangan tarikh tunggal.' 
+                  : 'Konfigurasikan acara sekali sahaja (fizikal atau pertandingan online).'}
+              </p>
+            </div>
             <button
               type="button"
               onClick={() => {
                 setIsCreating(false);
                 setEditingEvent(null);
               }}
-              className="text-xs text-slate-500 hover:text-slate-800 font-semibold"
+              className="text-xs text-slate-500 hover:text-slate-800 font-semibold cursor-pointer"
             >
               Batal
             </button>
           </div>
 
+          {/* Segmented Switcher for Event Type */}
+          <div className="bg-slate-100/90 p-1 rounded-2xl border border-slate-200">
+            <div className="grid grid-cols-2 gap-1.5">
+              <button
+                type="button"
+                onClick={() => setEventType('ONE_TIME_EVENT')}
+                className={`py-2 px-3 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                  eventType === 'ONE_TIME_EVENT'
+                    ? 'bg-white text-indigo-700 shadow-sm border border-slate-200/80'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Calendar className="w-4 h-4 text-indigo-600" />
+                <span>Acara Sekali Sahaja (One-Time Event)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setEventType('ONGOING_PROGRAM');
+                  if (status === 'Upcoming') setStatus('Registration Open');
+                }}
+                className={`py-2 px-3 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                  eventType === 'ONGOING_PROGRAM'
+                    ? 'bg-emerald-600 text-white shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Repeat className="w-4 h-4" />
+                <span>Program Berterusan (Ongoing Program)</span>
+              </button>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="md:col-span-2">
-              <label className="block text-xs font-bold text-slate-700 mb-1">Tajuk Event *</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                {eventType === 'ONGOING_PROGRAM' ? 'Nama Program Berterusan *' : 'Tajuk Event *'}
+              </label>
               <input
                 type="text"
                 required
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="Contoh: Pertandingan Reka Bentuk Poster Digital KPMBP"
+                placeholder={eventType === 'ONGOING_PROGRAM' ? "Contoh: Program Pengajian Al-Quran for Auladina KPMBP" : "Contoh: Pertandingan Reka Bentuk Poster Digital KPMBP"}
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
               />
             </div>
@@ -421,122 +528,358 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Mod Acara (Event Mode) *</label>
-              <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-xl border border-slate-200">
-                <button
-                  type="button"
-                  onClick={() => setEventMode('physical')}
-                  className={`py-1.5 rounded-lg text-xs font-bold transition-all ${
-                    eventMode === 'physical'
-                      ? 'bg-white text-indigo-600 shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  🏛️ Fizikal (Kampus)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setEventMode('online')}
-                  className={`py-1.5 rounded-lg text-xs font-bold transition-all ${
-                    eventMode === 'online'
-                      ? 'bg-indigo-600 text-white shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  🌐 Online / Atas Talian
-                </button>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Tarikh Acara (YYYY-MM-DD) *</label>
-              <input
-                type="date"
-                required
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-              />
-            </div>
-
-            {/* Conditional fields based on Event Mode */}
-            {eventMode === 'physical' ? (
-              <>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">Masa Mula *</label>
-                    <input
-                      type="text"
-                      required
-                      value={startTime}
-                      onChange={(e) => setStartTime(e.target.value)}
-                      placeholder="08:00 AM"
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">Masa Tamat *</label>
-                    <input
-                      type="text"
-                      required
-                      value={endTime}
-                      onChange={(e) => setEndTime(e.target.value)}
-                      placeholder="05:00 PM"
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                    />
-                  </div>
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Lokasi Kampus *</label>
-                  <input
-                    type="text"
-                    required
-                    value={location}
-                    onChange={(e) => setLocation(e.target.value)}
-                    placeholder="Dewan Besar KPMBP / Bilik Seminar Aras 3"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                  />
-                </div>
-              </>
-            ) : (
-              <div className="md:col-span-1 bg-amber-50/70 border border-amber-200 rounded-2xl p-3">
-                <label className="block text-xs font-black text-amber-900 mb-1">
-                  ⏰ Due Submission (Tarikh & Waktu Akhir Penghantaran) *
-                </label>
-                <input
-                  type="datetime-local"
-                  required
-                  value={submissionDeadline}
-                  onChange={(e) => setSubmissionDeadline(e.target.value)}
-                  className="w-full bg-white border border-amber-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500/20"
-                />
-                <p className="text-[10px] text-amber-700 font-medium mt-1">
-                  Masa mula, tamat & lokasi fizikal disembunyikan secara automatik untuk pertandingan/acara online.
-                </p>
-              </div>
-            )}
-
-            <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">Penganjur / Kelab / Unit *</label>
               <input
                 type="text"
                 required
                 value={organiser}
                 onChange={(e) => setOrganiser(e.target.value)}
-                placeholder="Kelab Kebudayaan / MPP KPMBP"
+                placeholder="Contoh: Unit Pendidikan Islam / Kelab Sahabat Al-Quran KPMBP"
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
               />
             </div>
 
+            {/* ONE_TIME_EVENT SPECIFIC FIELDS */}
+            {eventType === 'ONE_TIME_EVENT' ? (
+              <>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Mod Acara (Event Mode) *</label>
+                  <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-xl border border-slate-200">
+                    <button
+                      type="button"
+                      onClick={() => setEventMode('physical')}
+                      className={`py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        eventMode === 'physical'
+                          ? 'bg-white text-indigo-600 shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      🏛️ Fizikal (Kampus)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEventMode('online')}
+                      className={`py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        eventMode === 'online'
+                          ? 'bg-indigo-600 text-white shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      🌐 Online / Atas Talian
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Tarikh Acara (YYYY-MM-DD) *</label>
+                  <input
+                    type="date"
+                    required
+                    value={date}
+                    onChange={(e) => setDate(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                  />
+                </div>
+
+                {/* Conditional fields based on Event Mode */}
+                {eventMode === 'physical' ? (
+                  <>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">Masa Mula *</label>
+                        <input
+                          type="text"
+                          required
+                          value={startTime}
+                          onChange={(e) => setStartTime(e.target.value)}
+                          placeholder="08:00 AM"
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">Masa Tamat *</label>
+                        <input
+                          type="text"
+                          required
+                          value={endTime}
+                          onChange={(e) => setEndTime(e.target.value)}
+                          placeholder="05:00 PM"
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="md:col-span-2">
+                      <label className="block text-xs font-bold text-slate-700 mb-1">Lokasi Kampus *</label>
+                      <input
+                        type="text"
+                        required
+                        value={location}
+                        onChange={(e) => setLocation(e.target.value)}
+                        placeholder="Dewan Besar KPMBP / Bilik Seminar Aras 3"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <div className="md:col-span-1 bg-amber-50/70 border border-amber-200 rounded-2xl p-3">
+                    <label className="block text-xs font-black text-amber-900 mb-1">
+                      ⏰ Due Submission (Tarikh & Waktu Akhir Penghantaran) *
+                    </label>
+                    <input
+                      type="datetime-local"
+                      required
+                      value={submissionDeadline}
+                      onChange={(e) => setSubmissionDeadline(e.target.value)}
+                      className="w-full bg-white border border-amber-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500/20"
+                    />
+                    <p className="text-[10px] text-amber-700 font-medium mt-1">
+                      Masa mula, tamat & lokasi fizikal disembunyikan secara automatik untuk pertandingan/acara online.
+                    </p>
+                  </div>
+                )}
+              </>
+            ) : (
+              /* ONGOING_PROGRAM SPECIFIC FIELDS */
+              <div className="md:col-span-2 space-y-4 bg-emerald-50/40 border border-emerald-200/90 rounded-2xl p-4 sm:p-5">
+                <div className="flex items-center gap-2 text-emerald-950 font-black text-xs uppercase tracking-wider">
+                  <Repeat className="w-4 h-4 text-emerald-600" />
+                  <span>Maklumat Jadual & Sesi Program Berterusan</span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-800 mb-1">
+                      Ringkasan Kekerapan / Jadual Program *
+                    </label>
+                    <input
+                      type="text"
+                      value={scheduleSummary}
+                      onChange={(e) => setScheduleSummary(e.target.value)}
+                      placeholder="Contoh: 4 kali seminggu (Isnin, Rabu, Jumaat, Sabtu)"
+                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                    />
+                    <p className="text-[10px] text-slate-500 mt-1">
+                      Dipaparkan pada lencana kad acara untuk memudahkan peserta melihat jadual ringkas.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-800 mb-1">
+                      Lokasi Utama & Kaedah Penyertaan *
+                    </label>
+                    <input
+                      type="text"
+                      value={location}
+                      onChange={(e) => setLocation(e.target.value)}
+                      placeholder="Contoh: Google Meet & Bilik Seminar KPMBP (Hybrid / Online)"
+                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-800 mb-1">
+                      Tempoh Program (Pilihan)
+                    </label>
+                    <input
+                      type="text"
+                      value={programDuration}
+                      onChange={(e) => setProgramDuration(e.target.value)}
+                      placeholder="Contoh: Sepanjang Tahun 2026 / Sesi 2026/2027"
+                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-800 mb-1">
+                      Sasaran Peserta / Had Umur
+                    </label>
+                    <input
+                      type="text"
+                      value={targetAudience}
+                      onChange={(e) => setTargetAudience(e.target.value)}
+                      placeholder="Contoh: Umur 4 - 17 Tahun (Anak staf & pensyarah KPMBP)"
+                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                    />
+                  </div>
+                </div>
+
+                {/* Yuran / Sumbangan Selection */}
+                <div className="bg-white border border-emerald-200/80 rounded-xl p-3.5">
+                  <label className="block text-xs font-bold text-slate-900 mb-1.5">
+                    Kategori Yuran / Sumbangan
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFeeType('free');
+                        setFeeAmount('Percuma');
+                      }}
+                      className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all border ${
+                        feeType === 'free'
+                          ? 'bg-emerald-100 border-emerald-400 text-emerald-950 font-black'
+                          : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                      }`}
+                    >
+                      🎉 Percuma
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFeeType('voluntary');
+                        setFeeAmount('Sumbangan Ikhlas / Sukarela');
+                      }}
+                      className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all border ${
+                        feeType === 'voluntary'
+                          ? 'bg-emerald-100 border-emerald-400 text-emerald-950 font-black'
+                          : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                      }`}
+                    >
+                      🤝 Sumbangan Ikhlas
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFeeType('paid')}
+                      className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all border ${
+                        feeType === 'paid'
+                          ? 'bg-emerald-100 border-emerald-400 text-emerald-950 font-black'
+                          : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                      }`}
+                    >
+                      💳 Berbayar / Yuran
+                    </button>
+                  </div>
+
+                  {feeType === 'paid' && (
+                    <div className="mt-2.5">
+                      <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                        Jumlah Yuran (Contoh: RM 10 / Bulan)
+                      </label>
+                      <input
+                        type="text"
+                        value={feeAmount}
+                        onChange={(e) => setFeeAmount(e.target.value)}
+                        placeholder="Contoh: RM 15 / sesi atau RM 30 / bulan"
+                        className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Sesi Builder Section */}
+                <div className="bg-white border border-emerald-200 rounded-xl p-3.5 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="font-extrabold text-xs text-slate-900 block">
+                        Senarai Sesi Jadual Program ({scheduleSessions.length} sesi)
+                      </span>
+                      <span className="text-[11px] text-slate-500">
+                        Tetapkan hari, masa, kaedah (Online/Fizikal) dan aktiviti khusus bagi setiap sesi.
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleAddSession}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-all cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Tambah Sesi</span>
+                    </button>
+                  </div>
+
+                  {scheduleSessions.length === 0 ? (
+                    <div className="text-center py-4 bg-slate-50 rounded-lg border border-dashed border-slate-300">
+                      <Clock className="w-5 h-5 text-slate-400 mx-auto mb-1" />
+                      <p className="text-xs text-slate-500 font-medium">Belum ada sesi jadual ditambah.</p>
+                      <button
+                        type="button"
+                        onClick={handleAddSession}
+                        className="mt-2 text-xs font-bold text-emerald-600 hover:underline cursor-pointer"
+                      >
+                        + Tambah Sesi Pertama
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-2.5">
+                      {scheduleSessions.map((session, sIdx) => (
+                        <div key={session.id || sIdx} className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 flex-1 w-full">
+                            <div>
+                              <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Hari / Kekerapan</label>
+                              <input
+                                type="text"
+                                value={session.day}
+                                onChange={(e) => handleUpdateSession(sIdx, 'day', e.target.value)}
+                                placeholder="Isnin / Sabtu"
+                                className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs font-semibold"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Masa</label>
+                              <input
+                                type="text"
+                                value={session.time}
+                                onChange={(e) => handleUpdateSession(sIdx, 'time', e.target.value)}
+                                placeholder="08:30 PM - 09:30 PM"
+                                className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs font-semibold"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Kaedah</label>
+                              <select
+                                value={session.mode || 'online'}
+                                onChange={(e) => handleUpdateSession(sIdx, 'mode', e.target.value)}
+                                className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs font-semibold"
+                              >
+                                <option value="online">🌐 Online</option>
+                                <option value="physical">🏛️ Fizikal</option>
+                                <option value="hybrid">🔄 Hybrid</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Aktiviti / Topik</label>
+                              <input
+                                type="text"
+                                value={session.activity || ''}
+                                onChange={(e) => handleUpdateSession(sIdx, 'activity', e.target.value)}
+                                placeholder="Tajwid & Tahsin / Latihan"
+                                className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs"
+                              />
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveSession(sIdx)}
+                            className="text-rose-500 hover:text-rose-700 hover:bg-rose-50 p-1.5 rounded-lg shrink-0 self-end sm:self-center transition-colors cursor-pointer"
+                            title="Buang Sesi Ini"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Status Acara *</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Status Program / Acara *</label>
               <select
                 value={status}
                 onChange={(e) => setStatus(e.target.value as any)}
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
               >
-                {registrationMode === 'none' ? (
+                {eventType === 'ONGOING_PROGRAM' ? (
+                  <>
+                    <option value="Registration Open">Registration Open (Pendaftaran Dibuka)</option>
+                    <option value="Registration Closed">Registration Closed (Pendaftaran Ditutup)</option>
+                    <option value="Ongoing">Ongoing (Program Sedang Berjalan)</option>
+                    <option value="Completed">Completed (Telah Selesai / Tamat Sesi)</option>
+                    <option value="Cancelled">Cancelled (Dibatalkan)</option>
+                  </>
+                ) : registrationMode === 'none' ? (
                   <>
                     <option value="Upcoming">Upcoming (Akan Datang / Terbuka)</option>
                     <option value="Ongoing">Ongoing (Sedang Berlangsung)</option>
@@ -636,7 +979,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                     {registrationMode === 'google_form' && <Check className="w-4 h-4 text-indigo-600 shrink-0" />}
                   </div>
                   <p className="text-[10px] text-slate-500 mt-1 leading-snug">
-                    Pautan borang rasmi penganjur (Google Form, Microsoft Forms, dll).
+                    Pautan borang pendaftaran luar (Form Rasmi Penganjur seperti Google Form, Microsoft Forms, dll).
                   </p>
                 </button>
               </div>
@@ -718,7 +1061,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                       className="w-full bg-white border border-indigo-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
                     />
                     <p className="text-[10px] text-indigo-800 mt-1">
-                      Peserta yang menekan butang "Borang Daftar" akan terus dibawa ke pautan borang rasmi penganjur ini.
+                      Peserta yang menekan butang "Borang Daftar" akan terus dibawa ke pautan borang ini.
                     </p>
                   </div>
 
@@ -1027,16 +1370,23 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                     </div>
                   </td>
                   <td className="py-3 px-2 text-slate-600 whitespace-nowrap">
-                    <div className="flex items-center gap-1.5">
-                      <span className={`px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase ${
-                        evt.eventMode === 'online' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700'
-                      }`}>
-                        {evt.eventMode === 'online' ? 'Online' : 'Fizikal'}
+                    {isOngoingProgram(evt) ? (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-extrabold px-2 py-0.5 rounded-lg bg-emerald-100/95 text-emerald-950 border border-emerald-300 shadow-2xs">
+                        <Repeat className="w-3 h-3 text-emerald-700" />
+                        <span>Program Berterusan</span>
                       </span>
-                      <span className="text-[11px] font-extrabold px-2 py-0.5 rounded-lg bg-amber-100/95 text-amber-950 border border-amber-300 shadow-2xs">
-                        {formatDateDMY(evt.date)}
-                      </span>
-                    </div>
+                    ) : (
+                      <div className="flex items-center gap-1.5">
+                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase ${
+                          evt.eventMode === 'online' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700'
+                        }`}>
+                          {evt.eventMode === 'online' ? 'Online' : 'Fizikal'}
+                        </span>
+                        <span className="text-[11px] font-extrabold px-2 py-0.5 rounded-lg bg-amber-100/95 text-amber-950 border border-amber-300 shadow-2xs">
+                          {formatDateDMY(evt.date)}
+                        </span>
+                      </div>
+                    )}
                   </td>
                   <td className="py-3 px-2">
                     <span className={`px-2 py-0.5 rounded-lg text-[10px] font-extrabold uppercase tracking-wider ${getCategoryBadgeClass(evt.category)}`}>
@@ -1064,7 +1414,11 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                     </span>
                   </td>
                   <td className="py-3 px-2 text-slate-600 max-w-[170px] truncate text-[11px]">
-                    {evt.eventMode === 'online' ? (
+                    {isOngoingProgram(evt) ? (
+                      <span className="text-slate-700 font-semibold truncate block">
+                        {evt.scheduleSummary || evt.location || 'Program Berkala'}
+                      </span>
+                    ) : evt.eventMode === 'online' ? (
                       <span className="text-amber-700 font-bold">Due: {formatDeadlineMalay(evt.submissionDeadline)}</span>
                     ) : (
                       evt.location || '-'
