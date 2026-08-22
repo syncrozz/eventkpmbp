@@ -83,17 +83,6 @@ CREATE TABLE IF NOT EXISTS public.events (
   "updatedAt" TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Penambahan lajur baharu jika jadual sedia ada
-ALTER TABLE public.events ADD COLUMN IF NOT EXISTS "eventType" TEXT DEFAULT 'ONE_TIME_EVENT';
-ALTER TABLE public.events ADD COLUMN IF NOT EXISTS "organiserUrl" TEXT;
-ALTER TABLE public.events ADD COLUMN IF NOT EXISTS "scheduleSummary" TEXT;
-ALTER TABLE public.events ADD COLUMN IF NOT EXISTS "scheduleSessions" JSONB DEFAULT '[]'::jsonb;
-ALTER TABLE public.events ADD COLUMN IF NOT EXISTS "programDuration" TEXT;
-ALTER TABLE public.events ADD COLUMN IF NOT EXISTS "feeType" TEXT DEFAULT 'free';
-ALTER TABLE public.events ADD COLUMN IF NOT EXISTS "feeAmount" TEXT;
-ALTER TABLE public.events ADD COLUMN IF NOT EXISTS "targetAudience" TEXT;
-
-
 -- 2. Jadual Registrations (Pendaftaran Pelajar)
 CREATE TABLE IF NOT EXISTS public.registrations (
   id TEXT PRIMARY KEY,
@@ -196,77 +185,19 @@ export async function checkSupabaseHealth(): Promise<{ connected: boolean; messa
   }
 }
 
-// Helper to sanitize payload for Supabase insertion with backward & forward compatibility
+// Helper to sanitize payload for Supabase insertion
 function sanitizeEventForSupabase(event: Partial<KpmbpEvent>): Record<string, any> {
-  const existingTags = Array.isArray(event.tags) ? event.tags : [];
-  const cleanTags = existingTags.filter((t) => typeof t === 'string' && !t.startsWith('__meta__:'));
-
-  // Pack extended fields into JSON metadata tag for resilient storage across schema versions
-  const meta: Record<string, any> = {};
-  if (event.eventType !== undefined) meta.eventType = event.eventType;
-  if (event.organiserUrl !== undefined) meta.organiserUrl = event.organiserUrl;
-  if (event.scheduleSummary !== undefined) meta.scheduleSummary = event.scheduleSummary;
-  if (event.scheduleSessions !== undefined) meta.scheduleSessions = event.scheduleSessions;
-  if (event.programDuration !== undefined) meta.programDuration = event.programDuration;
-  if (event.feeType !== undefined) meta.feeType = event.feeType;
-  if (event.feeAmount !== undefined) meta.feeAmount = event.feeAmount;
-  if (event.targetAudience !== undefined) meta.targetAudience = event.targetAudience;
-
-  const finalTags = Object.keys(meta).length > 0
-    ? [...cleanTags, `__meta__:${JSON.stringify(meta)}`]
-    : cleanTags;
-
-  // Only include recognized top-level table columns to avoid schema cache rejection
-  const payload: Record<string, any> = {};
-  if (event.id !== undefined) payload.id = event.id;
-  if (event.title !== undefined) payload.title = event.title;
-  if (event.description !== undefined) payload.description = event.description;
-  if (event.category !== undefined) payload.category = event.category;
-  if (event.date !== undefined) payload.date = event.date;
-  if (event.startTime !== undefined) payload.startTime = event.startTime;
-  if (event.endTime !== undefined) payload.endTime = event.endTime;
-  if (event.location !== undefined) payload.location = event.location;
-  if (event.organiser !== undefined) payload.organiser = event.organiser;
-  if (event.image !== undefined) payload.image = event.image;
-  if (event.eventMode !== undefined) payload.eventMode = event.eventMode;
-  if (event.registrationMode !== undefined) payload.registrationMode = event.registrationMode;
-  if (event.organiserWhatsApp !== undefined) payload.organiserWhatsApp = event.organiserWhatsApp;
-  if (event.submissionDeadline !== undefined) payload.submissionDeadline = event.submissionDeadline;
-  if (event.registrationUrl !== undefined) payload.registrationUrl = event.registrationUrl;
-  if (event.registrationDeadline !== undefined) payload.registrationDeadline = event.registrationDeadline;
-  if (event.status !== undefined) payload.status = event.status;
-  if (event.eligibility !== undefined) payload.eligibility = event.eligibility;
-  if (event.contact !== undefined) payload.contact = event.contact;
-  if (event.featured !== undefined) payload.featured = event.featured;
-  if (event.importantNotice !== undefined) payload.importantNotice = event.importantNotice;
-  if (event.seatsLeft !== undefined) payload.seatsLeft = event.seatsLeft;
-  if (event.totalSeats !== undefined) payload.totalSeats = event.totalSeats;
-  payload.tags = finalTags;
-  if (event.createdAt !== undefined) payload.createdAt = event.createdAt;
-  if (event.updatedAt !== undefined) payload.updatedAt = event.updatedAt;
-
+  const payload: Record<string, any> = { ...event };
+  if (Array.isArray(payload.tags)) {
+    payload.tags = payload.tags;
+  }
   return payload;
 }
 
 // Convert Supabase database row to KpmbpEvent
 function mapRowToEvent(row: any): KpmbpEvent {
-  let parsedMeta: Record<string, any> = {};
-  const rawTags = Array.isArray(row.tags) ? row.tags : [];
-  const cleanTags: string[] = [];
-
-  for (const item of rawTags) {
-    if (typeof item === 'string' && item.startsWith('__meta__:')) {
-      try {
-        parsedMeta = JSON.parse(item.slice(9));
-      } catch {}
-    } else {
-      cleanTags.push(item);
-    }
-  }
-
   return {
     id: row.id,
-    eventType: row.eventType || row.event_type || parsedMeta.eventType || 'ONE_TIME_EVENT',
     title: row.title || '',
     description: row.description || '',
     category: row.category || 'Lain-lain',
@@ -279,7 +210,6 @@ function mapRowToEvent(row: any): KpmbpEvent {
     eventMode: row.eventMode || row.event_mode || 'physical',
     registrationMode: row.registrationMode || row.registration_mode || 'none',
     organiserWhatsApp: row.organiserWhatsApp || row.organiser_whatsapp || undefined,
-    organiserUrl: row.organiserUrl || row.organiser_url || parsedMeta.organiserUrl || undefined,
     submissionDeadline: row.submissionDeadline || row.submission_deadline || undefined,
     registrationUrl: row.registrationUrl || row.registration_url || undefined,
     registrationDeadline: row.registrationDeadline || row.registration_deadline || undefined,
@@ -290,15 +220,7 @@ function mapRowToEvent(row: any): KpmbpEvent {
     importantNotice: row.importantNotice || row.important_notice || undefined,
     seatsLeft: row.seatsLeft !== null && row.seatsLeft !== undefined ? Number(row.seatsLeft) : undefined,
     totalSeats: row.totalSeats !== null && row.totalSeats !== undefined ? Number(row.totalSeats) : undefined,
-    tags: cleanTags,
-    programDuration: row.programDuration || row.program_duration || parsedMeta.programDuration || undefined,
-    scheduleSummary: row.scheduleSummary || row.schedule_summary || parsedMeta.scheduleSummary || undefined,
-    scheduleSessions: Array.isArray(row.scheduleSessions || row.schedule_sessions) 
-      ? (row.scheduleSessions || row.schedule_sessions) 
-      : (Array.isArray(parsedMeta.scheduleSessions) ? parsedMeta.scheduleSessions : undefined),
-    feeType: row.feeType || row.fee_type || parsedMeta.feeType || undefined,
-    feeAmount: row.feeAmount || row.fee_amount || parsedMeta.feeAmount || undefined,
-    targetAudience: row.targetAudience || row.target_audience || parsedMeta.targetAudience || undefined,
+    tags: Array.isArray(row.tags) ? row.tags : [],
     createdAt: row.createdAt || row.created_at || undefined,
     updatedAt: row.updatedAt || row.updated_at || undefined,
   };
@@ -335,10 +257,31 @@ export async function seedInitialEventsToSupabase(): Promise<void> {
   if (!sb) return;
 
   try {
-    const formatted = INITIAL_EVENTS.map(e => sanitizeEventForSupabase({
-      ...e,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+    const formatted = INITIAL_EVENTS.map(e => ({
+      id: e.id,
+      title: e.title,
+      description: e.description,
+      category: e.category,
+      date: e.date,
+      startTime: e.startTime,
+      endTime: e.endTime,
+      location: e.location,
+      organiser: e.organiser,
+      image: e.image || null,
+      eventMode: e.eventMode || 'physical',
+      registrationMode: e.registrationMode || 'none',
+      organiserWhatsApp: e.organiserWhatsApp || null,
+      submissionDeadline: e.submissionDeadline || null,
+      registrationUrl: e.registrationUrl || null,
+      registrationDeadline: e.registrationDeadline || null,
+      status: e.status,
+      eligibility: e.eligibility,
+      contact: e.contact,
+      featured: e.featured ?? true,
+      importantNotice: e.importantNotice || null,
+      seatsLeft: e.seatsLeft ?? null,
+      totalSeats: e.totalSeats ?? null,
+      tags: e.tags || [],
     }));
 
     await sb.from('events').upsert(formatted, { onConflict: 'id' });

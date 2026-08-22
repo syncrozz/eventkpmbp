@@ -1,7 +1,7 @@
 import React from 'react';
 import { KpmbpEvent } from '../types';
-import { formatDateMalay, formatDeadlineMalay, getTimeRemainingMalay, getCategoryBadgeClass, getDynamicEventStatus, isOngoingProgram } from '../utils/calendar';
-import { Clock, MapPin, User, ArrowRight, Flame, AlertTriangle, Bookmark, Globe, ExternalLink, Edit2, Trash2, Repeat, Tag, Users } from 'lucide-react';
+import { formatDateMalay, formatDeadlineMalay, getTimeRemainingMalay, getCategoryBadgeClass, getDynamicEventStatus } from '../utils/calendar';
+import { Clock, MapPin, User, ArrowRight, Flame, AlertTriangle, Bookmark, Globe, ExternalLink, Edit2, Trash2 } from 'lucide-react';
 
 interface EventCardProps {
   event: KpmbpEvent;
@@ -24,11 +24,10 @@ export const EventCard: React.FC<EventCardProps> = ({
   onEdit,
   onDelete
 }) => {
-  const isOngoing = isOngoingProgram(event);
   const { day, month } = formatDateMalay(event.date);
   const liveStatus = getDynamicEventStatus(event);
   const isOnline = event.eventMode === 'online';
-  const timeRemaining = !isOngoing ? getTimeRemainingMalay(isOnline ? event.submissionDeadline || event.registrationDeadline : event.registrationDeadline) : null;
+  const timeRemaining = getTimeRemainingMalay(isOnline ? event.submissionDeadline || event.registrationDeadline : event.registrationDeadline);
 
   // Use unified pastel category badges
   const getCategoryColor = (cat: string) => getCategoryBadgeClass(cat);
@@ -41,7 +40,7 @@ export const EventCard: React.FC<EventCardProps> = ({
           return (
             <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-700 border border-emerald-300/80">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              SEDANG BERJALAN
+              SEDANG BERLANGSUNG
             </span>
           );
         case 'Completed':
@@ -59,7 +58,7 @@ export const EventCard: React.FC<EventCardProps> = ({
         default:
           return (
             <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200">
-              {isOngoing ? 'PROGRAM AKTIF' : 'TERBUKA / AKAN DATANG'}
+              TERBUKA / AKAN DATANG
             </span>
           );
       }
@@ -95,7 +94,7 @@ export const EventCard: React.FC<EventCardProps> = ({
       case 'Ongoing':
         return (
           <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-indigo-500/10 text-indigo-700 border border-indigo-300/80">
-            SEDANG BERJALAN
+            SEDANG BERLANGSUNG
           </span>
         );
       case 'Completed':
@@ -113,7 +112,7 @@ export const EventCard: React.FC<EventCardProps> = ({
       default:
         return (
           <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-700 border border-blue-200">
-            {isOngoing ? 'PROGRAM AKTIF' : 'AKAN DATANG'}
+            AKAN DATANG
           </span>
         );
     }
@@ -127,8 +126,8 @@ export const EventCard: React.FC<EventCardProps> = ({
     <div className="group bg-white/60 backdrop-blur-xl border border-white/80 rounded-2xl p-4 sm:p-5 shadow-2xs hover:shadow-md transition-all duration-200 flex flex-col justify-between h-full relative overflow-hidden hover:border-indigo-300 hover:-translate-y-0.5">
       
       <div>
-        {/* Top Priority: Urgent Deadline Banner (Only for ONE_TIME_EVENT when Closing Soon) */}
-        {!isOngoing && timeRemaining && liveStatus === 'Registration Closing Soon' && (
+        {/* Top Priority: Urgent Deadline Banner (If Closing Soon or Urgent) */}
+        {timeRemaining && liveStatus === 'Registration Closing Soon' && (
           <div className="mb-3 bg-gradient-to-r from-rose-50 to-rose-100/80 border border-rose-200 rounded-xl p-2 px-2.5 text-xs text-rose-900 flex items-center justify-between gap-2 shadow-2xs">
             <div className="flex items-center gap-1.5 min-w-0">
               <AlertTriangle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
@@ -140,20 +139,15 @@ export const EventCard: React.FC<EventCardProps> = ({
           </div>
         )}
 
-        {/* Header Row: Category, Mode Badge, Status, Save Button, Date Box / Program Badge */}
+        {/* Header Row: Category, Mode Badge, Status, Save Button, Date Box */}
         <div className="flex items-start justify-between gap-2 mb-3">
           <div className="flex flex-wrap items-center gap-1.5">
             <span className={`px-2 py-0.5 text-[10px] font-bold rounded-lg border ${getCategoryColor(event.category)}`}>
               {event.category}
             </span>
             
-            {/* Event Type / Mode Tag */}
-            {isOngoing ? (
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-black rounded-md bg-emerald-100 text-emerald-900 border border-emerald-300 shadow-2xs">
-                <Repeat className="w-3 h-3 text-emerald-700" />
-                PROGRAM BERTERUSAN
-              </span>
-            ) : isOnline ? (
+            {/* Event Mode Tag */}
+            {isOnline ? (
               <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-black rounded-md bg-amber-50 text-amber-700 border border-amber-200">
                 <Globe className="w-3 h-3 text-amber-600" />
                 ONLINE
@@ -177,7 +171,7 @@ export const EventCard: React.FC<EventCardProps> = ({
                       e.stopPropagation();
                       onEdit(event);
                     }}
-                    className="p-1 rounded-lg text-amber-400 hover:bg-white/20 transition-colors cursor-pointer"
+                    className="p-1 rounded-lg text-amber-400 hover:bg-white/20 transition-colors"
                     title="Sunting Acara Ini (Mod Pentadbir)"
                   >
                     <Edit2 className="w-3.5 h-3.5" />
@@ -189,7 +183,7 @@ export const EventCard: React.FC<EventCardProps> = ({
                       e.stopPropagation();
                       onDelete(event);
                     }}
-                    className="p-1 rounded-lg text-rose-400 hover:bg-white/20 transition-colors cursor-pointer"
+                    className="p-1 rounded-lg text-rose-400 hover:bg-white/20 transition-colors"
                     title="Padamkan Acara Ini"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
@@ -204,7 +198,7 @@ export const EventCard: React.FC<EventCardProps> = ({
                   e.stopPropagation();
                   onToggleSave(event.id);
                 }}
-                className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
+                className={`p-1.5 rounded-lg border transition-all ${
                   isSaved
                     ? 'bg-amber-50 border-amber-300 text-amber-600'
                     : 'bg-white/80 border-slate-200/80 text-slate-400 hover:text-slate-600 hover:bg-white'
@@ -215,18 +209,11 @@ export const EventCard: React.FC<EventCardProps> = ({
               </button>
             )}
 
-            {/* Date Box or Ongoing Badge Indicator */}
-            {isOngoing ? (
-              <div className="text-center bg-emerald-100/95 border border-emerald-300 px-2 py-1 rounded-xl shadow-2xs group-hover:bg-emerald-200/95 transition-all min-w-[44px] flex flex-col items-center justify-center">
-                <Repeat className="w-4 h-4 text-emerald-800" />
-                <span className="text-[8px] font-black text-emerald-900 uppercase mt-0.5 tracking-wider">BERKALA</span>
-              </div>
-            ) : (
-              <div className="text-center bg-amber-100/95 border border-amber-300 px-2.5 py-1 rounded-xl shadow-2xs group-hover:bg-amber-200/95 group-hover:border-amber-400 transition-all min-w-[44px]">
-                <div className="text-base font-black text-amber-950 leading-none">{day}</div>
-                <div className="text-[9px] font-black text-amber-800 uppercase tracking-wider mt-0.5">{month}</div>
-              </div>
-            )}
+            {/* Date Box with Pastel Yellow Highlight */}
+            <div className="text-center bg-amber-100/95 border border-amber-300 px-2.5 py-1 rounded-xl shadow-2xs group-hover:bg-amber-200/95 group-hover:border-amber-400 transition-all min-w-[44px]">
+              <div className="text-base font-black text-amber-950 leading-none">{day}</div>
+              <div className="text-[9px] font-black text-amber-800 uppercase tracking-wider mt-0.5">{month}</div>
+            </div>
           </div>
         </div>
 
@@ -256,34 +243,9 @@ export const EventCard: React.FC<EventCardProps> = ({
           {event.title}
         </h3>
 
-        {/* Key Attributes (Adapted to Ongoing Program vs Physical vs Online) */}
+        {/* Key Attributes (Adapted to Physical vs Online) */}
         <div className="text-xs text-slate-600 space-y-1.5 mb-3">
-          {isOngoing ? (
-            <>
-              {event.scheduleSummary && (
-                <div className="flex items-center gap-2 text-emerald-900 bg-emerald-50/70 px-2 py-1 rounded-lg border border-emerald-200/70">
-                  <Clock className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                  <span className="font-bold text-[11px] truncate">
-                    {event.scheduleSummary}
-                  </span>
-                </div>
-              )}
-              {event.location && (
-                <div className="flex items-center gap-2">
-                  <MapPin className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                  <span className="truncate font-medium">{event.location}</span>
-                </div>
-              )}
-              {event.feeType && (
-                <div className="flex items-center gap-2 text-[11px] text-slate-700">
-                  <Tag className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                  <span className="font-medium">
-                    Yuran: <span className="font-bold text-slate-900">{event.feeAmount || (event.feeType === 'free' ? 'Percuma' : event.feeType === 'voluntary' ? 'Sumbangan Sukarela' : 'Berbayar')}</span>
-                  </span>
-                </div>
-              )}
-            </>
-          ) : isOnline ? (
+          {isOnline ? (
             <div className="flex items-center gap-2 text-amber-900 bg-amber-50/70 px-2 py-1 rounded-lg border border-amber-200/60">
               <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
               <span className="font-bold text-[11px]">
@@ -323,16 +285,16 @@ export const EventCard: React.FC<EventCardProps> = ({
         {event.registrationMode === 'none' ? (
           <button
             onClick={() => onViewDetails(event)}
-            className="w-full bg-slate-900 hover:bg-slate-800 text-white py-2 px-3 rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
+            className="w-full bg-slate-900 hover:bg-slate-800 text-white py-2 px-3 rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 active:scale-95"
           >
-            <span>{isOngoing ? 'Info & Jadual Sesi' : 'Lihat Info Acara'}</span>
+            <span>Lihat Info Acara</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
         ) : (
           <>
             <button
               onClick={() => onViewDetails(event)}
-              className="flex-1 bg-white/80 hover:bg-white border border-slate-200 py-2 px-3 rounded-xl text-xs font-semibold text-slate-700 transition-all hover:border-slate-300 shadow-2xs active:scale-95 cursor-pointer"
+              className="flex-1 bg-white/80 hover:bg-white border border-slate-200 py-2 px-3 rounded-xl text-xs font-semibold text-slate-700 transition-all hover:border-slate-300 shadow-2xs active:scale-95"
             >
               Lihat Detail
             </button>
@@ -351,7 +313,7 @@ export const EventCard: React.FC<EventCardProps> = ({
               ) : (
                 <button
                   onClick={() => onRegister(event)}
-                  className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-3 rounded-xl text-xs font-bold shadow-sm shadow-indigo-200 transition-all flex items-center justify-center gap-1 active:scale-95 cursor-pointer"
+                  className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-3 rounded-xl text-xs font-bold shadow-sm shadow-indigo-200 transition-all flex items-center justify-center gap-1 active:scale-95"
                 >
                   <span>Daftar</span>
                   <ArrowRight className="w-3.5 h-3.5" />

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { KpmbpEvent, EventCategory } from '../types';
-import { formatDateMalay, getCategoryButtonClass, getCalendarEventPillClass, getCategoryBadgeClass, isOngoingProgram } from '../utils/calendar';
+import { formatDateMalay, getCategoryButtonClass, getCalendarEventPillClass, getCategoryBadgeClass } from '../utils/calendar';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, MapPin, Grid, List } from 'lucide-react';
 
 interface CalendarViewProps {
@@ -49,13 +49,10 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
   const firstDayOfWeek = new Date(currentYear, currentMonth, 1).getDay(); // 0 = Ahad
 
-  // Filter events (Exclude ongoing programs without specific one-time dates to avoid dummy calendar entries)
+  // Filter events
   const filteredEvents = events.filter((e) => {
-    if (isOngoingProgram(e)) return false;
     if (selectedCategory !== 'Semua' && e.category !== selectedCategory) return false;
-    if (!e.date) return false;
     const d = new Date(e.date);
-    if (isNaN(d.getTime())) return false;
     return d.getFullYear() === currentYear && d.getMonth() === currentMonth;
   });
 

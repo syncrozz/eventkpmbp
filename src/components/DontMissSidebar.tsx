@@ -1,6 +1,6 @@
 import React from 'react';
 import { KpmbpEvent, ViewTab } from '../types';
-import { getTimeRemainingMalay, formatDateMalay, sortEventsByNearestDue, getDynamicEventStatus, isEventArchived, isOngoingProgram } from '../utils/calendar';
+import { getTimeRemainingMalay, formatDateMalay, sortEventsByNearestDue, getDynamicEventStatus, isEventArchived } from '../utils/calendar';
 import { Flame, ArrowRight, Clock } from 'lucide-react';
 
 interface DontMissSidebarProps {
@@ -14,10 +14,10 @@ export const DontMissSidebar: React.FC<DontMissSidebarProps> = ({
   onViewDetails,
   onSelectTab
 }) => {
-  // Urgent events sorted by deadline urgency (excluding archived events and ongoing programs without deadlines)
+  // Urgent events sorted by deadline urgency (excluding archived events)
   const urgentEvents = sortEventsByNearestDue(
     events
-      .filter((e) => !isEventArchived(e) && !isOngoingProgram(e))
+      .filter((e) => !isEventArchived(e))
       .filter((e) => {
         const status = getDynamicEventStatus(e);
         return status === 'Registration Closing Soon' || (e.seatsLeft !== undefined && e.seatsLeft <= 5) || status === 'Registration Open';

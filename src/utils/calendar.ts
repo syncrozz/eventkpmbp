@@ -1,13 +1,6 @@
 import { KpmbpEvent, EventStatus } from '../types';
 
 /**
- * Checks whether an event is an Ongoing Programme.
- */
-export function isOngoingProgram(event?: KpmbpEvent): boolean {
-  return event?.eventType === 'ONGOING_PROGRAM';
-}
-
-/**
  * Normalizes time strings (e.g. '08:00 PM', '8:30 AM', '20:30') into hours & minutes.
  */
 export function parseTimeString(timeStr?: string): { hours: number; minutes: number } {
@@ -50,15 +43,9 @@ export function getEventStartTimestamp(event: KpmbpEvent): number {
  * Calculates the exact end timestamp of an event:
  * - Online: submissionDeadline timestamp (or end of date at 23:59:59)
  * - Physical: event date + endTime
- * - Ongoing Programme: 0 (No single end timestamp)
  */
 export function getEventEndTimestamp(event: KpmbpEvent): number {
   try {
-    // Ongoing programs do not have a fixed single end date timestamp
-    if (isOngoingProgram(event)) {
-      return 0;
-    }
-
     const isOnline = event.eventMode === 'online';
 
     if (isOnline) {
@@ -95,7 +82,6 @@ export function getEventEndTimestamp(event: KpmbpEvent): number {
  * Auto-Archive timestamp: Event end + 1 hour (3600000 ms)
  */
 export function getEventArchiveTimestamp(event: KpmbpEvent): number {
-  if (isOngoingProgram(event)) return 0;
   const endTime = getEventEndTimestamp(event);
   if (!endTime) return 0;
   return endTime + 1 * 60 * 60 * 1000; // +1 hour
@@ -106,12 +92,6 @@ export function getEventArchiveTimestamp(event: KpmbpEvent): number {
  */
 export function isEventArchived(event: KpmbpEvent, nowTimestamp = Date.now()): boolean {
   if (event.status === 'Cancelled' || event.status === 'Archived') return true;
-  
-  // Ongoing Program: Only archived if manually marked Archived or Cancelled
-  if (isOngoingProgram(event)) {
-    return false;
-  }
-
   const archiveTime = getEventArchiveTimestamp(event);
   if (!archiveTime) return false;
   return nowTimestamp >= archiveTime;
@@ -123,14 +103,6 @@ export function isEventArchived(event: KpmbpEvent, nowTimestamp = Date.now()): b
 export function getDynamicEventStatus(event: KpmbpEvent, nowTimestamp = Date.now()): EventStatus {
   if (event.status === 'Cancelled') return 'Cancelled';
   if (event.status === 'Fully Booked') return 'Fully Booked';
-
-  // Ongoing Program: Controlled manually via status (Default 'Registration Open')
-  if (isOngoingProgram(event)) {
-    if (event.status === 'Registration Closed' || event.status === 'Completed' || event.status === 'Archived' || event.status === 'Ongoing') {
-      return event.status;
-    }
-    return 'Registration Open';
-  }
 
   const isArchived = isEventArchived(event, nowTimestamp);
   if (isArchived) return 'Archived';
@@ -228,80 +200,9 @@ export function buildRegistrationWhatsAppUrl(params: {
 }
 
 export function getEventShareText(event: KpmbpEvent): string {
-  const isOngoing = isOngoingProgram(event);
-  const url = typeof window !== 'undefined' ? `${window.location.origin}${window.location.pathname}#event-${event.id}` : '';
-
-  if (isOngoing) {
-    let text = `📌 *${event.title}*\n`;
-    text += `🏷️ *Kategori:* ${event.category}\n`;
-    text += `🔄 *Jenis:* Program Berterusan\n`;
-    
-    if (event.scheduleSummary) {
-      text += `🗓️ *Jadual:* ${event.scheduleSummary}\n`;
-    }
-
-    if (event.scheduleSessions && event.scheduleSessions.length > 0) {
-      text += `\n📋 *Sesi & Waktu:*\n`;
-      event.scheduleSessions.forEach((s) => {
-        const modeLabel = s.mode === 'online' ? '🌐 Online' : s.mode === 'hybrid' ? '🔄 Hybrid' : '📍 Fizikal';
-        text += `• ${s.day} (${s.time}) [${modeLabel}]${s.activity ? `: ${s.activity}` : ''}\n`;
-      });
-      text += `\n`;
-    }
-
-    text += `📍 *Kaedah / Lokasi:* ${event.location || 'KPM Beranang (KPMBP)'}\n`;
-    
-    if (event.programDuration) {
-      text += `⏳ *Tempoh Program:* ${event.programDuration}\n`;
-    }
-
-    if (event.feeType === 'free') {
-      text += `💰 *Penyertaan:* Percuma\n`;
-    } else if (event.feeType === 'voluntary') {
-      text += `💰 *Sumbangan:* Sukarela / Infaq Ikhlas\n`;
-    } else if (event.feeAmount) {
-      text += `💰 *Yuran:* ${event.feeAmount}\n`;
-    }
-
-    text += `👤 *Anjuran:* ${event.organiser}\n`;
-    if (event.targetAudience || event.eligibility) {
-      text += `👥 *Sasaran:* ${event.targetAudience || event.eligibility}\n`;
-    }
-
-    if (event.registrationMode === 'none') {
-      text += `🎟️ *Pendaftaran:* Terbuka / Masuk Terus\n`;
-    } else if (event.registrationMode === 'google_form' && event.registrationUrl) {
-      text += `📝 *Borang Pendaftaran:* ${event.registrationUrl}\n`;
-    } else if (event.registrationMode === 'admin') {
-      text += `📝 *Pendaftaran:* Melalui Urusetia KPMBP\n`;
-      if (event.organiserWhatsApp) {
-        text += `📱 *WhatsApp Urusetia:* https://wa.me/${event.organiserWhatsApp.replace(/\D/g, '')}\n`;
-      }
-    }
-
-    if (event.description) {
-      text += `\n📄 *Keterangan Program:*\n${event.description}\n`;
-    }
-
-    if (event.contact) {
-      text += `\n📞 *Hubungi:* ${event.contact}\n`;
-    }
-
-    if (event.organiserUrl) {
-      text += `🌐 *Laman Rasmi:* ${event.organiserUrl}\n`;
-    }
-
-    if (url) {
-      text += `\n🔗 *Maklumat Penuh:* ${url}\n`;
-    }
-    text += `━━━━━━━━━━━━━━━━━━━━━\n`;
-    text += `_Portal Rasmi Acara KPMBP - © 2026 EVENT KPMBP_`;
-    return text;
-  }
-
-  // ONE_TIME_EVENT
   const { full: fullDateMalay } = formatDateMalay(event.date);
   const isOnline = event.eventMode === 'online';
+  const url = typeof window !== 'undefined' ? `${window.location.origin}${window.location.pathname}#event-${event.id}` : '';
 
   let text = `📌 *${event.title}*\n`;
   text += `🏷️ *Kategori:* ${event.category}\n`;
@@ -313,7 +214,7 @@ export function getEventShareText(event: KpmbpEvent): string {
       text += `⏳ *Tarikh Akhir Penyerahan:* ${formatDateDMY(event.submissionDeadline.split('T')[0])}\n`;
     }
   } else {
-    text += `🕒 *Masa:* ${event.startTime || ''}${event.endTime ? ` - ${event.endTime}` : ''}\n`;
+    text += `🕒 *Masa:* ${event.startTime}${event.endTime ? ` - ${event.endTime}` : ''}\n`;
     text += `📍 *Lokasi:* ${event.location || 'KPM Beranang (KPMBP)'}\n`;
   }
 
@@ -430,10 +331,7 @@ export function formatDeadlineMalay(deadlineStr?: string): string {
   return deadlineStr;
 }
 
-export function formatDateMalay(dateStr?: string): { day: string; month: string; year: string; full: string; dmy: string } {
-  if (!dateStr) {
-    return { day: '', month: '', year: '', full: '', dmy: '' };
-  }
+export function formatDateMalay(dateStr: string): { day: string; month: string; year: string; full: string; dmy: string } {
   try {
     const d = new Date(dateStr);
     if (isNaN(d.getTime())) {
@@ -494,8 +392,7 @@ export function getGoogleCalendarUrl(event: KpmbpEvent): string {
   const location = encodeURIComponent(event.location);
 
   // Parse YYYY-MM-DD
-  const dateStr = event.date || new Date().toISOString().split('T')[0];
-  const dateParts = dateStr.split('-');
+  const dateParts = event.date.split('-');
   const year = dateParts[0] || '2026';
   const month = dateParts[1] || '08';
   const day = dateParts[2] || '20';
@@ -507,7 +404,7 @@ export function getGoogleCalendarUrl(event: KpmbpEvent): string {
 }
 
 export function downloadIcsFile(event: KpmbpEvent) {
-  const dateClean = (event.date || new Date().toISOString().split('T')[0]).replace(/-/g, '');
+  const dateClean = event.date.replace(/-/g, '');
   const icsContent = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
@@ -534,14 +431,10 @@ export function downloadIcsFile(event: KpmbpEvent) {
 }
 
 export function getEventDueTimestamp(event: KpmbpEvent): number {
-  if (isOngoingProgram(event)) {
-    return Infinity;
-  }
   if (event.registrationDeadline) {
     const deadlineTime = new Date(event.registrationDeadline).getTime();
     if (!isNaN(deadlineTime)) return deadlineTime;
   }
-  if (!event.date) return Infinity;
   const dateTime = new Date(`${event.date}T00:00:00`).getTime();
   return isNaN(dateTime) ? Infinity : dateTime;
 }
@@ -551,8 +444,8 @@ export function sortEventsByNearestDue(events: KpmbpEvent[]): KpmbpEvent[] {
     const dueA = getEventDueTimestamp(a);
     const dueB = getEventDueTimestamp(b);
     if (dueA !== dueB) return dueA - dueB;
-    const dateA = a.date ? new Date(`${a.date}T00:00:00`).getTime() : Infinity;
-    const dateB = b.date ? new Date(`${b.date}T00:00:00`).getTime() : Infinity;
+    const dateA = new Date(`${a.date}T00:00:00`).getTime();
+    const dateB = new Date(`${b.date}T00:00:00`).getTime();
     return dateA - dateB;
   });
 }

@@ -1,5 +1,4 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
 import { 
   getFirestore, 
   initializeFirestore,
@@ -20,7 +19,6 @@ import firebaseConfig from '../../firebase-applet-config.json';
 
 // Initialize Firebase App
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-export const auth = getAuth(app);
 
 // Database ID configured in applet settings
 const designatedDbId = firebaseConfig.firestoreDatabaseId && firebaseConfig.firestoreDatabaseId !== '(default)'
@@ -181,7 +179,6 @@ export function subscribeToEvents(
           const data = docSnap.data();
           eventsList.push({
             id: docSnap.id,
-            eventType: data.eventType || 'ONE_TIME_EVENT',
             title: data.title || '',
             description: data.description || '',
             category: data.category || 'Akademik',
@@ -194,7 +191,6 @@ export function subscribeToEvents(
             eventMode: data.eventMode || 'physical',
             registrationMode: data.registrationMode || (data.registrationUrl ? 'google_form' : (data.organiserWhatsApp ? 'admin' : 'none')),
             organiserWhatsApp: data.organiserWhatsApp || undefined,
-            organiserUrl: data.organiserUrl || undefined,
             submissionDeadline: data.submissionDeadline || undefined,
             registrationUrl: data.registrationUrl || undefined,
             registrationDeadline: data.registrationDeadline || undefined,
@@ -205,15 +201,7 @@ export function subscribeToEvents(
             importantNotice: data.importantNotice || undefined,
             seatsLeft: typeof data.seatsLeft === 'number' ? data.seatsLeft : undefined,
             totalSeats: typeof data.totalSeats === 'number' ? data.totalSeats : undefined,
-            tags: Array.isArray(data.tags) ? data.tags : [],
-            programDuration: data.programDuration || undefined,
-            scheduleSummary: data.scheduleSummary || undefined,
-            scheduleSessions: Array.isArray(data.scheduleSessions) ? data.scheduleSessions : undefined,
-            feeType: data.feeType || undefined,
-            feeAmount: data.feeAmount || undefined,
-            targetAudience: data.targetAudience || undefined,
-            createdAt: data.createdAt || undefined,
-            updatedAt: data.updatedAt || undefined,
+            tags: Array.isArray(data.tags) ? data.tags : []
           });
         });
 

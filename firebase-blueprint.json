@@ -5,10 +5,9 @@
       "description": "KPMBP College events, competitions, workshops and activities",
       "type": "object",
       "properties": {
-        "eventType": { "type": "string", "description": "ONE_TIME_EVENT or ONGOING_PROGRAM" },
         "title": { "type": "string", "description": "Title of the event" },
         "description": { "type": "string", "description": "Full description of the event" },
-        "category": { "type": "string", "description": "Category (Akademik, Sukan, Kebudayaan, Kepimpinan, Keusahawanan, Pertandingan, Kerjaya, Program Pelajar)" },
+        "category": { "type": "string", "description": "Category (Akademik, Sukan, Kebudayaan, Kepimpinan, Keusahawanan, Pertandingan, Kerjaya)" },
         "date": { "type": "string", "description": "Event date (YYYY-MM-DD)" },
         "startTime": { "type": "string", "description": "Start time string" },
         "endTime": { "type": "string", "description": "End time string" },
@@ -16,12 +15,12 @@
         "organiser": { "type": "string", "description": "Organiser name / club" },
         "image": { "type": "string", "description": "Event banner / poster image URL" },
         "eventMode": { "type": "string", "description": "physical or online" },
-        "registrationMode": { "type": "string", "description": "admin, google_form, or none" },
+        "registrationMode": { "type": "string", "description": "admin or google_form" },
         "organiserWhatsApp": { "type": "string", "description": "Organiser WhatsApp number for admin registrations" },
         "submissionDeadline": { "type": "string", "description": "Submission deadline for online events" },
         "registrationUrl": { "type": "string", "description": "Google form link" },
         "registrationDeadline": { "type": "string", "description": "Deadline for registration" },
-        "status": { "type": "string", "description": "Registration Open, Registration Closing Soon, Registration Closed, Fully Booked, Upcoming, Ongoing, Completed, Cancelled, Archived" },
+        "status": { "type": "string", "description": "Registration Open, Registration Closing Soon, Registration Closed, Fully Booked, Ongoing, Completed, Cancelled, Archived" },
         "eligibility": { "type": "string", "description": "Eligibility conditions" },
         "contact": { "type": "string", "description": "Person in charge contact info" },
         "featured": { "type": "boolean", "description": "Whether event is highlighted" },
@@ -29,31 +28,10 @@
         "seatsLeft": { "type": "number", "description": "Number of remaining seats" },
         "totalSeats": { "type": "number", "description": "Total seat capacity" },
         "tags": { "type": "array", "items": { "type": "string" }, "description": "Search tags" },
-        "programDuration": { "type": "string", "description": "Duration for ongoing program (e.g. Sepanjang Semester)" },
-        "scheduleSummary": { "type": "string", "description": "Schedule summary (e.g. 4 kali seminggu)" },
-        "scheduleSessions": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "id": { "type": "string" },
-              "dayOfWeek": { "type": "string" },
-              "startTime": { "type": "string" },
-              "endTime": { "type": "string" },
-              "sessionName": { "type": "string" },
-              "location": { "type": "string" }
-            }
-          },
-          "description": "Recurring sessions list for ongoing programs"
-        },
-        "feeType": { "type": "string", "description": "free, paid, voluntary" },
-        "feeAmount": { "type": "string", "description": "Fee amount string" },
-        "targetAudience": { "type": "string", "description": "Target audience / participants" },
-        "maxCapacity": { "type": "number", "description": "Maximum capacity" },
         "createdAt": { "type": "string", "description": "Creation ISO timestamp" },
         "updatedAt": { "type": "string", "description": "Update ISO timestamp" }
       },
-      "required": ["title", "description", "category", "organiser", "status"]
+      "required": ["title", "description", "category", "date", "organiser", "status"]
     },
     "registrations": {
       "title": "Registrations",
