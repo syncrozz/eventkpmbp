@@ -105,7 +105,7 @@ export function getEventArchiveTimestamp(event: KpmbpEvent): number {
  * Checks if an event is archived (+1 hour after completion).
  */
 export function isEventArchived(event: KpmbpEvent, nowTimestamp = Date.now()): boolean {
-  if (event.status === 'Cancelled' || event.status === 'Archived') return true;
+  if (event.status === 'Cancelled' || event.status === 'Archived' || event.status === 'Completed') return true;
   
   // Ongoing Program: Only archived if manually marked Archived or Cancelled
   if (isOngoingProgram(event)) {
@@ -113,7 +113,16 @@ export function isEventArchived(event: KpmbpEvent, nowTimestamp = Date.now()): b
   }
 
   const archiveTime = getEventArchiveTimestamp(event);
-  if (!archiveTime) return false;
+  if (!archiveTime) {
+    if (event.date) {
+      const parts = event.date.split('-').map(Number);
+      if (parts.length === 3 && !isNaN(parts[0]) && !isNaN(parts[1]) && !isNaN(parts[2])) {
+        const endOfDay = new Date(parts[0], parts[1] - 1, parts[2], 23, 59, 59, 999).getTime();
+        return nowTimestamp >= endOfDay;
+      }
+    }
+    return false;
+  }
   return nowTimestamp >= archiveTime;
 }
 

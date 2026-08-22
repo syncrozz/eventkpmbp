@@ -8,6 +8,7 @@ import { EventDetailModal } from './components/EventDetailModal';
 import { DontMissSidebar } from './components/DontMissSidebar';
 import { CalendarView } from './components/CalendarView';
 import { RegistrationModal } from './components/RegistrationModal';
+import { ArchiveView } from './components/ArchiveView';
 import { AdminPortal } from './components/AdminPortal';
 import { AdminPinModal } from './components/AdminPinModal';
 import { DeleteConfirmationModal } from './components/DeleteConfirmationModal';
@@ -600,6 +601,21 @@ export default function App() {
               ))}
             </div>
           </div>
+        )}
+
+        {/* ARCHIVE TAB */}
+        {currentTab === 'archive' && (
+          <ArchiveView
+            events={archivedEvents}
+            onViewDetails={handleOpenDetailModal}
+            onRegister={setSelectedEventForRegistration}
+            savedEventIds={savedEventIds}
+            onToggleSave={handleToggleSave}
+            isAdmin={isAdminUnlocked}
+            onEdit={handleTriggerEdit}
+            onDelete={handleRequestDelete}
+            onSeedSampleData={handleSeedSampleData}
+          />
         )}
 
         {/* ADMIN TAB */}
