@@ -9,7 +9,8 @@ import {
   getTimeRemainingMalay, 
   getCategoryBadgeClass, 
   getDynamicEventStatus,
-  getEventShareText
+  getEventShareText,
+  isOngoingProgram
 } from '../utils/calendar';
 import { 
   updateDocumentOpenGraph,
@@ -19,7 +20,8 @@ import {
   X, Calendar, Clock, MapPin, User, ShieldAlert, 
   Share2, ExternalLink, Award, PhoneCall, Check, 
   CalendarPlus, MessageCircle, Copy, Globe, Send,
-  FileText, Download, Image as ImageIcon, Loader2, AlertCircle, Edit2, Trash2, Settings
+  FileText, Download, Image as ImageIcon, Loader2, AlertCircle, Edit2, Trash2, Settings,
+  Repeat, Layers, Tag, Users, CheckCircle2
 } from 'lucide-react';
 
 interface EventDetailModalProps {
@@ -70,10 +72,11 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
 
   if (!event) return null;
 
+  const isOngoing = isOngoingProgram(event);
   const { full: fullDateMalay } = formatDateMalay(event.date);
   const liveStatus = getDynamicEventStatus(event);
   const isOnline = event.eventMode === 'online';
-  const deadlineRemaining = getTimeRemainingMalay(isOnline ? event.submissionDeadline || event.registrationDeadline : event.registrationDeadline);
+  const deadlineRemaining = !isOngoing ? getTimeRemainingMalay(isOnline ? event.submissionDeadline || event.registrationDeadline : event.registrationDeadline) : null;
 
   const handleCopyInfo = () => {
     const fullText = getEventShareText(event);
@@ -143,7 +146,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                   onEdit(event);
                 }
               }}
-              className="bg-black/40 hover:bg-black/75 text-white/90 hover:text-amber-300 p-2 rounded-full backdrop-blur-md transition-all hover:scale-105 border border-white/15 shadow-sm group"
+              className="bg-black/40 hover:bg-black/75 text-white/90 hover:text-amber-300 p-2 rounded-full backdrop-blur-md transition-all hover:scale-105 border border-white/15 shadow-sm group cursor-pointer"
               title={isAdmin ? "Sunting Maklumat Acara (Mod Admin Aktif)" : "Akses Cepat Pentadbir (Masukkan PIN untuk Sunting)"}
               aria-label="Akses Pentadbir & Sunting Acara"
             >
@@ -153,7 +156,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
             {/* Close Button */}
             <button 
               onClick={onClose}
-              className="bg-black/40 hover:bg-black/75 text-white p-2 rounded-full backdrop-blur-md transition-colors border border-white/10"
+              className="bg-black/40 hover:bg-black/75 text-white p-2 rounded-full backdrop-blur-md transition-colors border border-white/10 cursor-pointer"
               title="Tutup (Esc)"
               aria-label="Tutup"
             >
@@ -170,9 +173,22 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                 {event.category}
               </span>
               <span className={`px-2.5 py-1 text-xs font-bold rounded-lg ${
-                isOnline ? 'bg-amber-400 text-amber-950' : 'bg-slate-700 text-white'
+                isOngoing 
+                  ? 'bg-emerald-400 text-emerald-950 flex items-center gap-1'
+                  : isOnline 
+                  ? 'bg-amber-400 text-amber-950' 
+                  : 'bg-slate-700 text-white'
               }`}>
-                {isOnline ? '🌐 ONLINE' : '🏛️ FIZIKAL'}
+                {isOngoing ? (
+                  <>
+                    <Repeat className="w-3.5 h-3.5" />
+                    <span>PROGRAM BERTERUSAN</span>
+                  </>
+                ) : isOnline ? (
+                  '🌐 ONLINE'
+                ) : (
+                  '🏛️ FIZIKAL'
+                )}
               </span>
             </div>
             <span className="px-3 py-1 text-xs font-bold rounded-lg bg-white/90 text-slate-800 backdrop-blur-md">
@@ -196,50 +212,80 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
 
           {/* Quick Info Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-50/80 border border-slate-200/80 rounded-2xl p-4 text-xs">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-xl bg-amber-100 border border-amber-300 text-amber-900 flex items-center justify-center shrink-0 shadow-2xs">
-                <Calendar className="w-4 h-4 text-amber-800" />
-              </div>
-              <div>
-                <div className="text-[10px] text-slate-400 font-bold uppercase">Tarikh Acara</div>
-                <div className="font-extrabold text-amber-950 bg-amber-100/90 border border-amber-300/80 px-2 py-0.5 rounded-lg inline-block text-xs mt-0.5">
-                  {fullDateMalay}
-                </div>
-              </div>
-            </div>
-
-            {isOnline ? (
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
-                  <Clock className="w-4 h-4" />
-                </div>
-                <div>
-                  <div className="text-[10px] text-amber-700 font-bold uppercase">Due Submission</div>
-                  <div className="font-bold text-amber-900 tracking-wide">
-                    {formatDeadlineMalay(event.submissionDeadline)}
+            {isOngoing ? (
+              <>
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-xl bg-emerald-100 border border-emerald-300 text-emerald-900 flex items-center justify-center shrink-0 shadow-2xs">
+                    <Repeat className="w-4 h-4 text-emerald-800" />
+                  </div>
+                  <div>
+                    <div className="text-[10px] text-slate-400 font-bold uppercase">Tempoh Program</div>
+                    <div className="font-extrabold text-emerald-950 bg-emerald-100/90 border border-emerald-300/80 px-2 py-0.5 rounded-lg inline-block text-xs mt-0.5">
+                      {event.programDuration || 'Berterusan Sepanjang Tahun'}
+                    </div>
                   </div>
                 </div>
-              </div>
+
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                    <Clock className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="text-[10px] text-slate-400 font-bold uppercase">Jadual Ringkas</div>
+                    <div className="font-bold text-slate-800">
+                      {event.scheduleSummary || 'Mengikut jadual sesi'}
+                    </div>
+                  </div>
+                </div>
+              </>
             ) : (
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0">
-                  <Clock className="w-4 h-4" />
+              <>
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-xl bg-amber-100 border border-amber-300 text-amber-900 flex items-center justify-center shrink-0 shadow-2xs">
+                    <Calendar className="w-4 h-4 text-amber-800" />
+                  </div>
+                  <div>
+                    <div className="text-[10px] text-slate-400 font-bold uppercase">Tarikh Acara</div>
+                    <div className="font-extrabold text-amber-950 bg-amber-100/90 border border-amber-300/80 px-2 py-0.5 rounded-lg inline-block text-xs mt-0.5">
+                      {fullDateMalay}
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <div className="text-[10px] text-slate-400 font-bold uppercase">Masa Program</div>
-                  <div className="font-bold text-slate-800">{event.startTime} {event.endTime ? `– ${event.endTime}` : ''}</div>
-                </div>
-              </div>
+
+                {isOnline ? (
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
+                      <Clock className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="text-[10px] text-amber-700 font-bold uppercase">Due Submission</div>
+                      <div className="font-bold text-amber-900 tracking-wide">
+                        {formatDeadlineMalay(event.submissionDeadline)}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0">
+                      <Clock className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="text-[10px] text-slate-400 font-bold uppercase">Masa Program</div>
+                      <div className="font-bold text-slate-800">{event.startTime} {event.endTime ? `– ${event.endTime}` : ''}</div>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
 
             <div className="flex items-center gap-3">
               <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
-                isOnline ? 'bg-amber-100 text-amber-700' : 'bg-indigo-100 text-indigo-700'
+                isOngoing ? 'bg-emerald-100 text-emerald-700' : isOnline ? 'bg-amber-100 text-amber-700' : 'bg-indigo-100 text-indigo-700'
               }`}>
                 {isOnline ? <Globe className="w-4 h-4" /> : <MapPin className="w-4 h-4" />}
               </div>
               <div>
-                <div className="text-[10px] text-slate-400 font-bold uppercase">Mod & Lokasi</div>
+                <div className="text-[10px] text-slate-400 font-bold uppercase">Lokasi / Tempat</div>
                 <div className="font-bold text-slate-800">
                   {isOnline ? 'Atas Talian (Online Platform)' : (event.location || 'Kampus KPMBP')}
                 </div>
@@ -251,14 +297,14 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                 <Award className="w-4 h-4" />
               </div>
               <div>
-                <div className="text-[10px] text-slate-400 font-bold uppercase">Kelayakan / Syarat</div>
-                <div className="font-bold text-slate-800 truncate max-w-[180px]">{event.eligibility}</div>
+                <div className="text-[10px] text-slate-400 font-bold uppercase">Kelayakan / Sasaran</div>
+                <div className="font-bold text-slate-800 truncate max-w-[180px]">{event.targetAudience || event.eligibility}</div>
               </div>
             </div>
           </div>
 
-          {/* Registration Deadline Warning Banner */}
-          {event.registrationMode !== 'none' && deadlineRemaining && (
+          {/* Registration Deadline Warning Banner (ONE_TIME_EVENT only) */}
+          {!isOngoing && event.registrationMode !== 'none' && deadlineRemaining && (
             <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 text-xs text-rose-900 flex items-start gap-3">
               <ShieldAlert className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
               <div>
@@ -275,10 +321,49 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
             </div>
           )}
 
-          {/* Description ("Tentang Event") */}
+          {/* Detailed Schedule & Session Breakdown (For ONGOING_PROGRAM) */}
+          {isOngoing && event.scheduleSessions && event.scheduleSessions.length > 0 && (
+            <div>
+              <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-2.5 flex items-center gap-1.5">
+                <Layers className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Jadual & Sesi Program Berkala</span>
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {event.scheduleSessions.map((session, idx) => (
+                  <div
+                    key={session.id || idx}
+                    className="p-3 bg-emerald-50/50 border border-emerald-200/70 rounded-xl space-y-1"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-black uppercase text-emerald-950 px-2 py-0.5 bg-emerald-100 rounded-md">
+                        {session.dayOfWeek}
+                      </span>
+                      <span className="text-xs font-bold text-emerald-800 flex items-center gap-1">
+                        <Clock className="w-3 h-3 text-emerald-600" />
+                        {session.startTime} - {session.endTime}
+                      </span>
+                    </div>
+                    {session.sessionName && (
+                      <div className="text-xs font-extrabold text-slate-900 pt-0.5">
+                        {session.sessionName}
+                      </div>
+                    )}
+                    {session.location && (
+                      <div className="text-[11px] text-slate-500 flex items-center gap-1">
+                        <MapPin className="w-3 h-3 text-slate-400" />
+                        <span>{session.location}</span>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Description ("Tentang Program / Event") */}
           <div>
             <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">
-              Tentang Event
+              {isOngoing ? 'Tentang Program' : 'Tentang Event'}
             </h3>
             <p className="text-slate-700 text-sm leading-relaxed whitespace-pre-line bg-white/60 p-4 rounded-2xl border border-slate-100">
               {event.description}
@@ -295,7 +380,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                 <button
                   onClick={handleDownloadPoster}
                   disabled={isGeneratingOgi}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-bold transition-all shadow-2xs active:scale-95 disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-bold transition-all shadow-2xs active:scale-95 disabled:opacity-50 cursor-pointer"
                   title="Muat turun fail poster rasmi program ini"
                 >
                   {isGeneratingOgi ? (
@@ -333,10 +418,30 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                     : 'Google Form Rasmi'}
                 </span>
               </div>
+              {isOngoing && event.feeType && (
+                <div className="flex items-start gap-2">
+                  <span className="font-bold text-slate-800 min-w-[140px]">Struktur Yuran:</span>
+                  <span className="text-slate-900 font-extrabold">
+                    {event.feeAmount || (event.feeType === 'free' ? 'Percuma' : event.feeType === 'voluntary' ? 'Sumbangan Sukarela' : 'Berbayar')}
+                  </span>
+                </div>
+              )}
               <div className="flex items-start gap-2">
                 <span className="font-bold text-slate-800 min-w-[140px]">Syarat Kelayakan:</span>
                 <span className="text-slate-600">{event.eligibility}</span>
               </div>
+              {event.targetAudience && (
+                <div className="flex items-start gap-2">
+                  <span className="font-bold text-slate-800 min-w-[140px]">Kumpulan Sasaran:</span>
+                  <span className="text-slate-600">{event.targetAudience}</span>
+                </div>
+              )}
+              {event.maxCapacity && (
+                <div className="flex items-start gap-2">
+                  <span className="font-bold text-slate-800 min-w-[140px]">Kapasiti Maksimum:</span>
+                  <span className="text-slate-600">{event.maxCapacity} Peserta</span>
+                </div>
+              )}
               <div className="flex items-start gap-2">
                 <span className="font-bold text-slate-800 min-w-[140px]">MARA MERIT:</span>
                 <span className="text-emerald-700 font-bold">Disediakan untuk semua peserta berdaftar</span>
@@ -397,41 +502,43 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
             </div>
           )}
 
-          {/* Calendar Sync Options */}
-          <div>
-            <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">
-              Simpan Ke Kalendar Anda
-            </h3>
-            <div className="flex flex-wrap gap-2">
-              <a
-                href={getGoogleCalendarUrl(event)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-700 hover:border-indigo-400 transition-colors shadow-2xs"
-              >
-                <CalendarPlus className="w-4 h-4 text-indigo-600" />
-                <span>Tambah ke Kalendar</span>
-              </a>
+          {/* Calendar Sync Options (Only for ONE_TIME_EVENT with valid dates) */}
+          {!isOngoing && (
+            <div>
+              <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">
+                Simpan Ke Kalendar Anda
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                <a
+                  href={getGoogleCalendarUrl(event)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-700 hover:border-indigo-400 transition-colors shadow-2xs"
+                >
+                  <CalendarPlus className="w-4 h-4 text-indigo-600" />
+                  <span>Tambah ke Kalendar</span>
+                </a>
 
-              <button
-                onClick={() => downloadIcsFile(event)}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-700 hover:border-indigo-400 transition-colors shadow-2xs"
-              >
-                <Calendar className="w-4 h-4 text-slate-600" />
-                <span>Muat Turun Fail .ICS</span>
-              </button>
+                <button
+                  onClick={() => downloadIcsFile(event)}
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-700 hover:border-indigo-400 transition-colors shadow-2xs cursor-pointer"
+                >
+                  <Calendar className="w-4 h-4 text-slate-600" />
+                  <span>Muat Turun Fail .ICS</span>
+                </button>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Share Section */}
           <div>
             <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">
-              Kongsi Event Bersama Rakan KPMBP
+              Kongsi Program Bersama Rakan KPMBP
             </h3>
             <div className="flex flex-wrap gap-2">
               <button
                 onClick={handleShareWhatsApp}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-500 text-white text-xs font-bold hover:bg-emerald-600 transition-colors shadow-sm"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-500 text-white text-xs font-bold hover:bg-emerald-600 transition-colors shadow-sm cursor-pointer"
               >
                 <MessageCircle className="w-4 h-4" />
                 <span>WhatsApp</span>
@@ -439,7 +546,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
 
               <button
                 onClick={handleShareTelegram}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-sky-500 text-white text-xs font-bold hover:bg-sky-600 transition-colors shadow-sm"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-sky-500 text-white text-xs font-bold hover:bg-sky-600 transition-colors shadow-sm cursor-pointer"
               >
                 <Share2 className="w-4 h-4" />
                 <span>Telegram</span>
@@ -447,12 +554,12 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
 
               <button
                 onClick={handleCopyInfo}
-                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all active:scale-95 shadow-2xs ${
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all active:scale-95 shadow-2xs cursor-pointer ${
                   copied 
                     ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' 
                     : 'bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200/80'
                 }`}
-                title="Salin maklumat lengkap acara yang sedia ditampal ke WhatsApp atau Notes"
+                title="Salin maklumat lengkap program yang sedia ditampal ke WhatsApp atau Notes"
               >
                 {copied ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4 text-slate-600" />}
                 <span>{copied ? 'Maklumat Disalin!' : 'Salin Maklumat'}</span>
@@ -461,7 +568,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
               <button
                 onClick={handleDownloadPoster}
                 disabled={isGeneratingOgi}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-bold transition-colors shadow-2xs disabled:opacity-60"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-bold transition-colors shadow-2xs disabled:opacity-60 cursor-pointer"
                 title="Muat turun poster rasmi program ini"
               >
                 {isGeneratingOgi ? (
@@ -488,7 +595,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
           <div className="flex items-center gap-2">
             <button
               onClick={onClose}
-              className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
+              className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
             >
               Tutup
             </button>
@@ -501,7 +608,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                       onClose();
                       onEdit(event);
                     }}
-                    className="px-3 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold transition-colors flex items-center gap-1.5 shadow-2xs"
+                    className="px-3 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold transition-colors flex items-center gap-1.5 shadow-2xs cursor-pointer"
                     title="Sunting Acara Ini"
                   >
                     <Edit2 className="w-3.5 h-3.5" />
@@ -513,7 +620,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                     onClick={() => {
                       onDelete(event);
                     }}
-                    className="px-3 py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold transition-colors flex items-center gap-1.5 shadow-2xs"
+                    className="px-3 py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold transition-colors flex items-center gap-1.5 shadow-2xs cursor-pointer"
                     title="Padamkan Acara Ini"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
@@ -525,15 +632,25 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
           </div>
 
           {event.registrationMode === 'none' ? (
-            <a
-              href={getGoogleCalendarUrl(event)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex-1 bg-slate-900 hover:bg-slate-800 text-white py-2.5 px-5 rounded-xl text-xs sm:text-sm font-extrabold shadow-md transition-all flex items-center justify-center gap-2"
-            >
-              <CalendarPlus className="w-4 h-4 text-emerald-400" />
-              <span>Simpan ke Google Calendar</span>
-            </a>
+            !isOngoing ? (
+              <a
+                href={getGoogleCalendarUrl(event)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 bg-slate-900 hover:bg-slate-800 text-white py-2.5 px-5 rounded-xl text-xs sm:text-sm font-extrabold shadow-md transition-all flex items-center justify-center gap-2"
+              >
+                <CalendarPlus className="w-4 h-4 text-emerald-400" />
+                <span>Simpan ke Google Calendar</span>
+              </a>
+            ) : (
+              <button
+                onClick={onClose}
+                className="flex-1 bg-slate-900 hover:bg-slate-800 text-white py-2.5 px-5 rounded-xl text-xs sm:text-sm font-extrabold shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                <span>Program Terbuka / Hadir Terus</span>
+              </button>
+            )
           ) : isRegistrationAvailable ? (
             event.registrationMode === 'google_form' && event.registrationUrl ? (
               <a
@@ -551,9 +668,9 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                   onClose();
                   onRegister(event);
                 }}
-                className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 px-5 rounded-xl text-xs sm:text-sm font-extrabold shadow-lg shadow-indigo-200 transition-all flex items-center justify-center gap-2"
+                className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 px-5 rounded-xl text-xs sm:text-sm font-extrabold shadow-lg shadow-indigo-200 transition-all flex items-center justify-center gap-2 cursor-pointer"
               >
-                <span>Daftar via WhatsApp Admin</span>
+                <span>Daftar via WhatsApp Urusetia</span>
                 <Send className="w-4 h-4" />
               </button>
             )
@@ -562,7 +679,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
               disabled
               className="flex-1 bg-slate-200 text-slate-500 py-2.5 px-5 rounded-xl text-xs font-bold cursor-not-allowed"
             >
-              {liveStatus === 'Archived' ? 'Acara Telah Diarkibkan' : 'Pendaftaran Tidak Dibuka / Ditutup'}
+              {liveStatus === 'Archived' ? 'Program Telah Diarkibkan' : 'Pendaftaran Tidak Dibuka / Ditutup'}
             </button>
           )}
         </div>
