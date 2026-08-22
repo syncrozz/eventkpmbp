@@ -246,18 +246,23 @@ export default function App() {
     try {
       const newId = await createNewEvent(newEventData);
       createdEvent = { ...newEventData, id: newId };
+      setEvents((prev) => {
+        const next = [createdEvent, ...prev.filter((e) => e.id !== createdEvent.id)];
+        try { localStorage.setItem('kpmbp_events_v2', JSON.stringify(next)); } catch {}
+        return next;
+      });
+      showToast(`Acara "${newEventData.title}" berjaya diterbitkan & disegerakkan ke pangkalan data awan!`);
     } catch (err: any) {
       console.warn('Saving event locally (Cloud notice):', err?.message);
       const tempId = `kpmbp-evt-${Date.now()}`;
       createdEvent = { ...newEventData, id: tempId };
+      setEvents((prev) => {
+        const next = [createdEvent, ...prev.filter((e) => e.id !== createdEvent.id)];
+        try { localStorage.setItem('kpmbp_events_v2', JSON.stringify(next)); } catch {}
+        return next;
+      });
+      showToast(`Acara "${newEventData.title}" disimpan secara lokal.`);
     }
-
-    setEvents((prev) => {
-      const next = [createdEvent, ...prev.filter((e) => e.id !== createdEvent.id)];
-      try { localStorage.setItem('kpmbp_events_v2', JSON.stringify(next)); } catch {}
-      return next;
-    });
-    showToast(`Acara "${newEventData.title}" berjaya diterbitkan & disimpan!`);
   };
 
   const handleUpdateEvent = async (updated: KpmbpEvent) => {
@@ -274,10 +279,11 @@ export default function App() {
 
     try {
       await updateExistingEvent(updated);
+      showToast(`Maklumat "${updated.title}" telah berjaya dikemaskini & disegerakkan ke awan!`);
     } catch (err: any) {
       console.warn('Notice: Update stored locally (Cloud notice):', err?.message);
+      showToast(`Maklumat "${updated.title}" dikemaskini pada peranti ini.`);
     }
-    showToast(`Maklumat "${updated.title}" telah berjaya dikemaskini!`);
   };
 
   const handleRequestDelete = (target: KpmbpEvent | string) => {
@@ -308,11 +314,12 @@ export default function App() {
 
     try {
       await deleteExistingEvent(targetId);
+      showToast(`Acara "${targetTitle}" telah berjaya dipadam dari pangkalan data awan.`);
     } catch (err: any) {
       console.warn('Notice: Deleted from local storage (Cloud notice):', err?.message);
+      showToast(`Acara "${targetTitle}" telah dipadam dari peranti ini.`);
     } finally {
       setIsDeletingEvent(false);
-      showToast(`Acara "${targetTitle}" telah berjaya dipadam.`);
     }
   };
 

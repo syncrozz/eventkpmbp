@@ -329,23 +329,23 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                 <span>Jadual & Sesi Program Berkala</span>
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                {event.scheduleSessions.map((session, idx) => (
+                {event.scheduleSessions.map((session: any, idx) => (
                   <div
                     key={session.id || idx}
                     className="p-3 bg-emerald-50/50 border border-emerald-200/70 rounded-xl space-y-1"
                   >
                     <div className="flex items-center justify-between">
                       <span className="text-[11px] font-black uppercase text-emerald-950 px-2 py-0.5 bg-emerald-100 rounded-md">
-                        {session.dayOfWeek}
+                        {session.day || session.dayOfWeek || 'Sesi'}
                       </span>
                       <span className="text-xs font-bold text-emerald-800 flex items-center gap-1">
                         <Clock className="w-3 h-3 text-emerald-600" />
-                        {session.startTime} - {session.endTime}
+                        {session.time || (session.startTime ? `${session.startTime} - ${session.endTime}` : '')}
                       </span>
                     </div>
-                    {session.sessionName && (
+                    {(session.activity || session.sessionName) && (
                       <div className="text-xs font-extrabold text-slate-900 pt-0.5">
-                        {session.sessionName}
+                        {session.activity || session.sessionName}
                       </div>
                     )}
                     {session.location && (
@@ -436,10 +436,10 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                   <span className="text-slate-600">{event.targetAudience}</span>
                 </div>
               )}
-              {event.maxCapacity && (
+              {event.totalSeats && (
                 <div className="flex items-start gap-2">
                   <span className="font-bold text-slate-800 min-w-[140px]">Kapasiti Maksimum:</span>
-                  <span className="text-slate-600">{event.maxCapacity} Peserta</span>
+                  <span className="text-slate-600">{event.totalSeats} Peserta</span>
                 </div>
               )}
               <div className="flex items-start gap-2">
