@@ -12,6 +12,7 @@ import { ArchiveView } from './components/ArchiveView';
 import { AdminPortal } from './components/AdminPortal';
 import { AdminPinModal } from './components/AdminPinModal';
 import { DeleteConfirmationModal } from './components/DeleteConfirmationModal';
+import { Footer } from './components/Footer';
 import { sortEventsByNearestDue, getCategoryButtonClass, isEventArchived } from './utils/calendar';
 import { 
   subscribeToAllEvents,
@@ -697,29 +698,8 @@ export default function App() {
         isDeleting={isDeletingEvent}
       />
 
-      {/* Footer */}
-      <footer className="mt-auto border-t border-white/40 bg-white/30 backdrop-blur-md py-6 z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-center text-xs text-slate-600 font-medium text-center">
-          <div className="flex items-center justify-center gap-2">
-            <img 
-              src="https://raw.githubusercontent.com/syncrozz/syncrozz-assets/main/logo/Event%20KPMBP/android-chrome-192x192.png" 
-              alt="Event KPMBP Logo" 
-              className="w-5 h-5 object-contain rounded"
-            />
-            <span>
-              © 2026 EVENT KPMBP. By{' '}
-              <a 
-                href="https://wasap.my/60145313756" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="font-black text-indigo-600 hover:text-indigo-800 underline transition-colors"
-              >
-                Syncrozz
-              </a>
-            </span>
-          </div>
-        </div>
-      </footer>
+      {/* Global SYNCROZZ Standard Footer */}
+      <Footer />
 
     </div>
   );
