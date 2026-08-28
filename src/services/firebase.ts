@@ -14,7 +14,7 @@ import {
   serverTimestamp,
   getDocFromServer
 } from 'firebase/firestore';
-import { KpmbpEvent, RegistrationRecord } from '../types';
+import { KpmbpEvent, RegistrationRecord, HeroConfig, DEFAULT_HERO_CONFIG } from '../types';
 import { INITIAL_EVENTS } from '../data/initialEvents';
 import firebaseConfig from '../../firebase-applet-config.json';
 
@@ -41,6 +41,8 @@ export const db = primaryDb;
 
 const EVENTS_COLLECTION = 'events';
 const REGISTRATIONS_COLLECTION = 'registrations';
+const SETTINGS_COLLECTION = 'settings';
+const HERO_CONFIG_DOC_ID = 'hero_carousel';
 
 /**
  * Deeply sanitizes any object or array by removing `undefined` keys
@@ -65,6 +67,29 @@ export function sanitizeForFirestore(obj: any): any {
     }
   }
   return clean;
+}
+
+// Helper to load stored Hero Carousel config cache
+export function getLocalHeroConfigCache(): HeroConfig {
+  if (typeof window === 'undefined') return DEFAULT_HERO_CONFIG;
+  try {
+    const raw = localStorage.getItem('kpmbp_hero_config_v1');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && Array.isArray(parsed.slides) && parsed.slides.length > 0) {
+        return parsed;
+      }
+    }
+  } catch {}
+  return DEFAULT_HERO_CONFIG;
+}
+
+// Helper to save stored Hero Carousel config cache
+export function saveLocalHeroConfigCache(config: HeroConfig): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem('kpmbp_hero_config_v1', JSON.stringify(config));
+  } catch {}
 }
 
 // Helper to load stored events cache
@@ -392,3 +417,79 @@ export async function deleteRegistrationFromFirestore(id: string): Promise<void>
     console.warn('Registration deleted from local cache:', err?.message);
   }
 }
+
+/**
+ * Subscribes to real-time Hero Carousel configuration updates in Firestore
+ */
+export function subscribeToHeroConfig(
+  onUpdate: (config: HeroConfig) => void,
+  onError?: (err: Error) => void
+) {
+  // Emit local cached config first
+  const cached = getLocalHeroConfigCache();
+  onUpdate(cached);
+
+  const docRef = doc(db, SETTINGS_COLLECTION, HERO_CONFIG_DOC_ID);
+  let unsubscribe: (() => void) | null = null;
+
+  try {
+    unsubscribe = onSnapshot(
+      docRef,
+      (snapshot) => {
+        if (snapshot.exists()) {
+          const data = snapshot.data();
+          if (data && Array.isArray(data.slides)) {
+            const config: HeroConfig = {
+              autoPlay: data.autoPlay ?? true,
+              intervalSeconds: typeof data.intervalSeconds === 'number' ? data.intervalSeconds : 6,
+              slides: data.slides
+            };
+            saveLocalHeroConfigCache(config);
+            onUpdate(config);
+            return;
+          }
+        }
+        // If doc doesn't exist yet, preserve cached or default
+        onUpdate(getLocalHeroConfigCache());
+      },
+      (err) => {
+        console.warn('Hero config sync notice (using local storage):', err.message);
+        onUpdate(getLocalHeroConfigCache());
+        if (onError) onError(err);
+      }
+    );
+  } catch (err: any) {
+    console.warn('Hero config subscription unavailable:', err?.message);
+    onUpdate(getLocalHeroConfigCache());
+    if (onError) onError(err);
+  }
+
+  return () => {
+    if (unsubscribe) {
+      try {
+        unsubscribe();
+      } catch {}
+    }
+  };
+}
+
+/**
+ * Saves the Hero Carousel configuration to Firestore and local storage cache
+ */
+export async function saveHeroConfigToFirestore(config: HeroConfig): Promise<void> {
+  // 1. Immediately cache locally
+  saveLocalHeroConfigCache(config);
+
+  // 2. Persist to Firestore
+  try {
+    const docRef = doc(db, SETTINGS_COLLECTION, HERO_CONFIG_DOC_ID);
+    const payload = sanitizeForFirestore({
+      ...config,
+      updatedAt: new Date().toISOString()
+    });
+    await setDoc(docRef, payload, { merge: true });
+  } catch (err: any) {
+    console.warn('Hero config stored in local cache (Cloud notice):', err?.message);
+  }
+}
+

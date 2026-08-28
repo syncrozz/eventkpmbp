@@ -12,5 +12,10 @@ service cloud.firestore {
     match /registrations/{registrationId} {
       allow read, write: if true;
     }
+
+    // Settings collection: allow read and write for hero carousel and site configurations
+    match /settings/{settingId} {
+      allow read, write: if true;
+    }
   }
 }

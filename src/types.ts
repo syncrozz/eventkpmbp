@@ -88,3 +88,77 @@ export interface RegistrationRecord {
 }
 
 export type ViewTab = 'discover' | 'events' | 'calendar' | 'dont-miss' | 'archive' | 'admin';
+
+export type HeroCtaAction =
+  | 'tab_calendar'
+  | 'tab_events'
+  | 'tab_dont_miss'
+  | 'tab_archive'
+  | 'open_event'
+  | 'external_url';
+
+export interface HeroSlide {
+  id: string; // e.g. 'slide_1', 'slide_2'
+  enabled: boolean;
+  badgeText: string;
+  badgeIcon?: 'sparkle' | 'calendar' | 'flame' | 'shield' | 'star' | 'book' | 'compass';
+  title: string;
+  subtitle?: string;
+  description: string;
+  imageUrl?: string;
+  imageAlt?: string;
+  linkedEventId?: string; // Optional: Link to a specific event
+  primaryCtaText: string;
+  primaryCtaAction: HeroCtaAction;
+  primaryCtaTarget?: string; // Event ID or external URL
+  secondaryCtaText?: string;
+  secondaryCtaAction?: HeroCtaAction | 'none';
+  secondaryCtaTarget?: string;
+  accentTheme?: 'indigo' | 'purple' | 'emerald' | 'amber' | 'rose' | 'blue';
+}
+
+export interface HeroConfig {
+  autoPlay: boolean;
+  intervalSeconds: number;
+  slides: HeroSlide[];
+}
+
+export const DEFAULT_HERO_CONFIG: HeroConfig = {
+  autoPlay: true,
+  intervalSeconds: 6,
+  slides: [
+    {
+      id: 'slide_1',
+      enabled: true,
+      badgeText: 'Pusat Maklumat Rasmi KPMBP',
+      badgeIcon: 'sparkle',
+      title: 'Pusat Acara & Program Rasmi KPMBP',
+      subtitle: 'Kolej Profesional MARA Bandar Penawar',
+      description: 'Cari Event, Aktiviti, Pertandingan, dan Bengkel yang berlangsung di Kolej Profesional MARA Bandar Penawar dalam satu platform berpusat.',
+      imageUrl: 'https://raw.githubusercontent.com/syncrozz/syncrozz-assets/main/OGI/OGI.Event.v3.jpg',
+      imageAlt: 'Event KPMBP',
+      primaryCtaText: 'Lihat Semua Acara',
+      primaryCtaAction: 'tab_events',
+      secondaryCtaText: 'Buka Kalendar Event',
+      secondaryCtaAction: 'tab_calendar',
+      accentTheme: 'indigo'
+    },
+    {
+      id: 'slide_2',
+      enabled: true,
+      badgeText: 'Panduan Discovery Platform',
+      badgeIcon: 'calendar',
+      title: 'Rancang Jadual Melalui Kalendar Event',
+      subtitle: 'Semak tarikh, sesi & tarikh tutup dengan mudah',
+      description: 'Gunakan mod Kalendar untuk melihat keseluruhan aktiviti bulanan dan tarikh penting program KPMBP secara visual dan teratur tanpa terlepas sebarang acara.',
+      imageUrl: 'https://images.unsplash.com/photo-1506784983877-45594efa4cbe?q=80&w=1000&auto=format&fit=crop',
+      imageAlt: 'Kalendar Acara KPMBP',
+      primaryCtaText: 'Buka Kalendar Sekarang',
+      primaryCtaAction: 'tab_calendar',
+      secondaryCtaText: 'Jelajah Aktiviti',
+      secondaryCtaAction: 'tab_events',
+      accentTheme: 'purple'
+    }
+  ]
+};
+

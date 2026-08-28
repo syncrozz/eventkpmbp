@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { KpmbpEvent, EventCategory, ViewTab, RegistrationRecord } from './types';
+import { KpmbpEvent, EventCategory, ViewTab, RegistrationRecord, HeroConfig, DEFAULT_HERO_CONFIG } from './types';
 import { INITIAL_EVENTS } from './data/initialEvents';
 import { Navbar } from './components/Navbar';
 import { HeroSection } from './components/HeroSection';
@@ -23,7 +23,9 @@ import {
   resetAndSeedDemoEvents,
   bulkImportEvents,
   getActiveBackendLabel,
-  getActiveBackendType
+  getActiveBackendType,
+  subscribeToHeroConfig,
+  saveHeroConfig
 } from './services/dbAdapter';
 import { Sparkles, Calendar as CalendarIcon, Filter, Flame, CheckCircle2, ShieldCheck, Bookmark, Lock, KeyRound, Archive, Cloud } from 'lucide-react';
 
@@ -42,6 +44,22 @@ export default function App() {
   });
 
   const [isFirebaseConnected, setIsFirebaseConnected] = useState(false);
+
+  // Hero Carousel Configuration State with local persistence fallback
+  const [heroConfig, setHeroConfig] = useState<HeroConfig>(() => {
+    try {
+      const cached = localStorage.getItem('kpmbp_hero_config_v1');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed && Array.isArray(parsed.slides) && parsed.slides.length > 0) {
+          return parsed;
+        }
+      }
+    } catch {
+      // Fallback
+    }
+    return DEFAULT_HERO_CONFIG;
+  });
 
   const [savedEventIds, setSavedEventIds] = useState<string[]>(() => {
     try {
@@ -81,7 +99,7 @@ export default function App() {
 
   // 1. Real-time synchronization (Supabase / Firestore / Local Cache)
   useEffect(() => {
-    const unsubscribe = subscribeToAllEvents(
+    const unsubscribeEvents = subscribeToAllEvents(
       (incomingEvents) => {
         if (Array.isArray(incomingEvents) && incomingEvents.length > 0) {
           setEvents(incomingEvents);
@@ -94,7 +112,16 @@ export default function App() {
       }
     );
 
-    return () => unsubscribe();
+    const unsubscribeHero = subscribeToHeroConfig((incomingHeroConfig) => {
+      if (incomingHeroConfig && Array.isArray(incomingHeroConfig.slides) && incomingHeroConfig.slides.length > 0) {
+        setHeroConfig(incomingHeroConfig);
+      }
+    });
+
+    return () => {
+      unsubscribeEvents();
+      unsubscribeHero();
+    };
   }, []);
 
   // Deep-linking hash support: Automatically open Event Detail Modal if URL contains #event-ID
@@ -370,6 +397,17 @@ export default function App() {
     }
   };
 
+  const handleSaveHeroConfig = async (newConfig: HeroConfig) => {
+    try {
+      await saveHeroConfig(newConfig);
+      setHeroConfig(newConfig);
+      showToast('Tetapan Hero Carousel berjaya disimpan & disegerakkan!');
+    } catch (err: any) {
+      console.error('Error updating hero config:', err);
+      showToast('Gagal menyimpan tetapan Hero Carousel ke pelayan.');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-['Plus_Jakarta_Sans',sans-serif] text-slate-900 relative overflow-x-hidden selection:bg-indigo-500 selection:text-white">
       
@@ -407,7 +445,10 @@ export default function App() {
             
             {/* Hero Section */}
             <HeroSection
+              heroConfig={heroConfig}
+              events={events}
               onSelectTab={setCurrentTab}
+              onViewDetails={handleOpenDetailModal}
               openCount={openRegistrationCount}
               urgentCount={urgentCount}
               selectedCategory={selectedCategory}
@@ -632,6 +673,8 @@ export default function App() {
                 onClearInitialEditingEvent={() => setEditingEventInAdmin(null)}
                 onSeedSampleData={handleSeedSampleData}
                 onBulkImportEvents={handleBulkImportEvents}
+                heroConfig={heroConfig}
+                onSaveHeroConfig={handleSaveHeroConfig}
               />
             ) : (
               <div className="max-w-md mx-auto my-12 bg-white/80 backdrop-blur-xl border border-slate-200/80 rounded-3xl p-8 text-center space-y-5 shadow-xl">

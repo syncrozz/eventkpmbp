@@ -1,12 +1,23 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { KpmbpEvent, EventCategory, EventStatus, RegistrationRecord, RegistrationMode, EventType, ProgramSession } from '../types';
+import { 
+  KpmbpEvent, 
+  EventCategory, 
+  EventStatus, 
+  RegistrationRecord, 
+  RegistrationMode, 
+  EventType, 
+  ProgramSession,
+  HeroConfig,
+  HeroSlide,
+  DEFAULT_HERO_CONFIG,
+  HeroCtaAction
+} from '../types';
 import { 
   subscribeToAllRegistrations, 
   deleteExistingRegistration, 
   getActiveBackendLabel, 
   getActiveBackendType 
 } from '../services/dbAdapter';
-import { SUPABASE_SQL_SETUP, isSupabaseConfigured, checkSupabaseHealth } from '../services/supabase';
 import { formatDateDMY, formatDeadlineMalay, getCategoryBadgeClass, isOngoingProgram } from '../utils/calendar';
 import { optimizeEventImage } from '../utils/imageOptimizer';
 import { 
@@ -19,8 +30,10 @@ import {
   Plus, Trash2, Edit2, ShieldCheck, Check, Sparkles, AlertCircle, 
   Image as ImageIcon, Upload, Link as LinkIcon, X, Eye, Cloud, Users, 
   Search, Phone, Mail, Calendar, Download, RefreshCw, Loader2, Database, Copy, CheckCheck, WifiOff, Globe, ExternalLink,
-  Repeat, Clock, Layers, FileSpreadsheet, FileUp, FileDown, CheckCircle2, FileText, ArrowUpDown, HelpCircle
+  Repeat, Clock, Layers, FileSpreadsheet, FileUp, FileDown, CheckCircle2, FileText, ArrowUpDown, HelpCircle,
+  SlidersHorizontal, ArrowLeftRight, Star, Flame, Shield, BookOpen, Compass, Save, RotateCcw, MonitorPlay
 } from 'lucide-react';
+import { AdminHeroManager } from './AdminHeroManager';
 
 interface AdminPortalProps {
   events: KpmbpEvent[];
@@ -31,6 +44,8 @@ interface AdminPortalProps {
   onClearInitialEditingEvent?: () => void;
   onSeedSampleData?: () => void;
   onBulkImportEvents?: (events: KpmbpEvent[], replaceAll: boolean) => Promise<void>;
+  heroConfig?: HeroConfig;
+  onSaveHeroConfig?: (config: HeroConfig) => Promise<void> | void;
 }
 
 export const AdminPortal: React.FC<AdminPortalProps> = ({
@@ -41,19 +56,31 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   initialEditingEvent,
   onClearInitialEditingEvent,
   onSeedSampleData,
-  onBulkImportEvents
+  onBulkImportEvents,
+  heroConfig,
+  onSaveHeroConfig
 }) => {
-  const [activeAdminTab, setActiveAdminTab] = useState<'events' | 'registrations'>('events');
+  const [activeAdminTab, setActiveAdminTab] = useState<'events' | 'registrations' | 'hero'>('events');
   const [registrations, setRegistrations] = useState<RegistrationRecord[]>([]);
   const [regSearchQuery, setRegSearchQuery] = useState('');
   const [selectedRegEventId, setSelectedRegEventId] = useState<string>('all');
-  const [showSqlModal, setShowSqlModal] = useState(false);
-  const [copiedSql, setCopiedSql] = useState(false);
-  const [supabaseHealth, setSupabaseHealth] = useState<{ checked: boolean; connected: boolean; message: string }>({
-    checked: false,
-    connected: false,
-    message: ''
+
+  // Hero Carousel Configuration State
+  const [adminHeroConfig, setAdminHeroConfig] = useState<HeroConfig>(() => {
+    return heroConfig && Array.isArray(heroConfig.slides) && heroConfig.slides.length > 0
+      ? heroConfig
+      : DEFAULT_HERO_CONFIG;
   });
+  const [isSavingHero, setIsSavingHero] = useState(false);
+  const [heroSaveSuccess, setHeroSaveSuccess] = useState(false);
+  const [heroPreviewIndex, setHeroPreviewIndex] = useState(0);
+
+  // Synchronize when external heroConfig updates
+  useEffect(() => {
+    if (heroConfig && Array.isArray(heroConfig.slides) && heroConfig.slides.length > 0) {
+      setAdminHeroConfig(heroConfig);
+    }
+  }, [heroConfig]);
 
   const [editingEvent, setEditingEvent] = useState<KpmbpEvent | null>(null);
   const [isCreating, setIsCreating] = useState(false);
@@ -146,25 +173,6 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     }
   };
 
-  // Check live Supabase connection status on mount
-  useEffect(() => {
-    if (isSupabaseConfigured()) {
-      checkSupabaseHealth().then((res) => {
-        setSupabaseHealth({
-          checked: true,
-          connected: res.connected,
-          message: res.message
-        });
-      });
-    } else {
-      setSupabaseHealth({
-        checked: true,
-        connected: false,
-        message: 'Konfigurasi VITE_SUPABASE_URL belum dimasukkan.'
-      });
-    }
-  }, []);
-
   // Auto-load initialEditingEvent if requested from card/modal
   useEffect(() => {
     if (initialEditingEvent) {
@@ -175,7 +183,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     }
   }, [initialEditingEvent]);
 
-  // Subscribe to live student registrations across active cloud backend
+  // Subscribe to live student registrations across Firestore cloud backend
   useEffect(() => {
     const unsub = subscribeToAllRegistrations((list) => {
       setRegistrations(list);
@@ -434,35 +442,11 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
             <span>Portal Pentadbir Event</span>
           </div>
           
-          {getActiveBackendType() === 'supabase' ? (
-            supabaseHealth.connected ? (
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-300 rounded-full text-[11px] font-bold">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                <Database className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Supabase PostgreSQL (Aktif & Live Sync)</span>
-              </div>
-            ) : (
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-rose-50 text-rose-700 border border-rose-300 rounded-full text-[11px] font-bold">
-                <WifiOff className="w-3.5 h-3.5 text-rose-600" />
-                <span>Supabase PostgreSQL (Tidak Bersambung)</span>
-              </div>
-            )
-          ) : (
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-full text-[11px] font-bold">
-              <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
-              <Cloud className="w-3.5 h-3.5 text-indigo-600" />
-              <span>Firebase Cloud / Local Mode</span>
-            </div>
-          )}
-
-          <button
-            type="button"
-            onClick={() => setShowSqlModal(true)}
-            className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-full text-[11px] font-bold transition-colors cursor-pointer"
-          >
-            <Database className="w-3 h-3 text-slate-500" />
-            <span>Skrip SQL Supabase</span>
-          </button>
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-full text-[11px] font-bold">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <Cloud className="w-3.5 h-3.5 text-indigo-600" />
+            <span>Firebase Firestore Cloud (Live Sync)</span>
+          </div>
         </div>
       </div>
 
@@ -499,6 +483,23 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
               activeAdminTab === 'registrations' ? 'bg-emerald-500 text-white' : 'bg-emerald-100 text-emerald-800'
             }`}>
               {registrations.length}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setActiveAdminTab('hero')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all ${
+              activeAdminTab === 'hero'
+                ? 'bg-slate-900 text-white shadow-sm'
+                : 'text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+            <span>Hero Carousel & Komunikasi</span>
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+              activeAdminTab === 'hero' ? 'bg-amber-400 text-slate-950' : 'bg-amber-100 text-amber-900'
+            }`}>
+              {(heroConfig?.slides?.filter((s) => s.enabled).length ?? 2)} Aktif
             </span>
           </button>
         </div>
@@ -1731,6 +1732,15 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
         </div>
       )}
 
+      {/* Tab 3: Admin-Controlled Hero Carousel & Communication Manager */}
+      {activeAdminTab === 'hero' && (
+        <AdminHeroManager
+          heroConfig={heroConfig}
+          events={events}
+          onSaveHeroConfig={onSaveHeroConfig}
+        />
+      )}
+
       {/* CSV Import & Restore Confirmation Modal */}
       {isImportModalOpen && (
         <div 
@@ -2006,86 +2016,6 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                   )}
                 </button>
               </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Supabase SQL Setup Modal */}
-      {showSqlModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-200">
-          <div 
-            className="relative w-full max-w-2xl bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-200 flex flex-col max-h-[85vh]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Header */}
-            <div className="bg-slate-900 text-white p-5 flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
-                  <Database className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-extrabold">Skrip SQL Jadual Supabase</h3>
-                  <p className="text-[11px] text-slate-400">Salin dan laksanakan kod ini di Supabase SQL Editor anda.</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowSqlModal(false)}
-                className="p-1.5 rounded-full bg-white/10 hover:bg-white/20 text-slate-300 transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* SQL Content */}
-            <div className="p-5 overflow-y-auto space-y-4 text-xs">
-              <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 text-emerald-900 space-y-1">
-                <p className="font-bold">Langkah Pemasangan di Supabase:</p>
-                <ol className="list-decimal list-inside space-y-1 text-[11px] text-emerald-800">
-                  <li>Buka papan pemuka Supabase anda (<strong>SQL Editor</strong>).</li>
-                  <li>Tampal kod SQL di bawah dan klik <strong>Run</strong>.</li>
-                  <li>Jadual <code>events</code> & <code>registrations</code> berserta polisi keselamatan (RLS) & Realtime akan dicipta secara automatik.</li>
-                </ol>
-              </div>
-
-              <div className="relative">
-                <pre className="p-4 bg-slate-950 text-emerald-300 font-mono text-[11px] rounded-2xl overflow-x-auto leading-relaxed border border-slate-800 max-h-[300px]">
-                  {SUPABASE_SQL_SETUP}
-                </pre>
-                <button
-                  type="button"
-                  onClick={() => {
-                    navigator.clipboard.writeText(SUPABASE_SQL_SETUP);
-                    setCopiedSql(true);
-                    setTimeout(() => setCopiedSql(false), 2500);
-                  }}
-                  className="absolute top-3 right-3 px-3 py-1.5 bg-white/20 hover:bg-white/30 text-white rounded-xl text-[11px] font-bold backdrop-blur-md flex items-center gap-1.5 transition-all shadow-sm"
-                >
-                  {copiedSql ? (
-                    <>
-                      <CheckCheck className="w-3.5 h-3.5 text-emerald-400" />
-                      <span>Disalin!</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-3.5 h-3.5" />
-                      <span>Salin SQL</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setShowSqlModal(false)}
-                className="px-5 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-black transition-colors"
-              >
-                Tutup
-              </button>
             </div>
           </div>
         </div>

@@ -80,6 +80,10 @@
     "/registrations/{registrationId}": {
       "schema": "registrations",
       "description": "Event registrations submitted by students"
+    },
+    "/settings/{settingId}": {
+      "schema": "settings",
+      "description": "Application settings including Hero Carousel configuration"
     }
   }
 }
