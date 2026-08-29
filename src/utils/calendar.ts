@@ -8,41 +8,56 @@ export function isOngoingProgram(event?: KpmbpEvent): boolean {
 }
 
 /**
- * Normalizes time strings (e.g. '08:00 PM', '8:30 AM', '20:30') into hours & minutes.
+ * Normalizes time strings (e.g. '08:00 PM', '8:30 AM', '15:00', '8.30 pagi', '2:00 petang') into hours & minutes (24h).
  */
 export function parseTimeString(timeStr?: string): { hours: number; minutes: number } {
   if (!timeStr) return { hours: 8, minutes: 0 };
   
-  const clean = timeStr.trim();
-  const match12 = clean.match(/(\d{1,2})[:.](\d{2})\s*(AM|PM)?/i);
-  if (match12) {
-    let hours = parseInt(match12[1], 10);
-    const minutes = parseInt(match12[2], 10);
-    const meridiem = match12[3]?.toUpperCase();
+  const raw = timeStr.trim();
+  const clean = raw.toLowerCase();
+  
+  // Detect 12-hour indicators (English & Malay)
+  const isPM = clean.includes('pm') || clean.includes('petang') || clean.includes('malam');
+  const isAM = clean.includes('am') || clean.includes('pagi');
 
-    if (meridiem === 'PM' && hours < 12) hours += 12;
-    if (meridiem === 'AM' && hours === 12) hours = 0;
+  // Extract hours and minutes
+  const match = clean.match(/(\d{1,2})(?:[:.](\d{2}))?/);
+  if (match) {
+    let hours = parseInt(match[1], 10);
+    const minutes = match[2] ? parseInt(match[2], 10) : 0;
 
-    return { hours: isNaN(hours) ? 8 : hours, minutes: isNaN(minutes) ? 0 : minutes };
+    if (isPM && hours < 12) {
+      hours += 12;
+    } else if (isAM && hours === 12) {
+      hours = 0;
+    }
+
+    return { 
+      hours: isNaN(hours) ? 8 : Math.min(Math.max(hours, 0), 23), 
+      minutes: isNaN(minutes) ? 0 : Math.min(Math.max(minutes, 0), 59) 
+    };
   }
 
   return { hours: 8, minutes: 0 };
 }
 
 /**
- * Calculates the exact start timestamp of an event (Physical or Online).
+ * Calculates the exact start timestamp of an event (Physical or Online) using EVENT DATE + START TIME.
  */
 export function getEventStartTimestamp(event: KpmbpEvent): number {
   try {
-    if (!event.date) return 0;
-    const [y, m, d] = event.date.split('-').map((v) => parseInt(v, 10));
-    if (!y || !m || !d) return 0;
-
+    if (!event.date) return Infinity;
+    const parts = event.date.split('-').map((v) => parseInt(v, 10));
+    if (parts.length < 3 || isNaN(parts[0]) || isNaN(parts[1]) || isNaN(parts[2])) {
+      return Infinity;
+    }
+    const [y, m, d] = parts;
     const { hours, minutes } = parseTimeString(event.startTime);
     const dt = new Date(y, m - 1, d, hours, minutes, 0, 0);
-    return dt.getTime();
+    const time = dt.getTime();
+    return isNaN(time) ? Infinity : time;
   } catch {
-    return 0;
+    return Infinity;
   }
 }
 
@@ -542,27 +557,42 @@ export function downloadIcsFile(event: KpmbpEvent) {
   document.body.removeChild(link);
 }
 
-export function getEventDueTimestamp(event: KpmbpEvent): number {
-  if (isOngoingProgram(event)) {
-    return Infinity;
+/**
+ * Primary event sorting timestamp based on EVENT DATE + START TIME.
+ */
+export function getEventSortingTimestamp(event: KpmbpEvent): number {
+  if (event.date) {
+    const parts = event.date.split('-').map((v) => parseInt(v, 10));
+    if (parts.length >= 3 && !isNaN(parts[0]) && !isNaN(parts[1]) && !isNaN(parts[2])) {
+      const [y, m, d] = parts;
+      const { hours, minutes } = parseTimeString(event.startTime);
+      const dt = new Date(y, m - 1, d, hours, minutes, 0, 0);
+      const time = dt.getTime();
+      if (!isNaN(time)) return time;
+    }
   }
+
+  // Fallback for ongoing programs or events without a fixed single date
   if (event.registrationDeadline) {
     const deadlineTime = new Date(event.registrationDeadline).getTime();
     if (!isNaN(deadlineTime)) return deadlineTime;
   }
-  if (!event.date) return Infinity;
-  const dateTime = new Date(`${event.date}T00:00:00`).getTime();
-  return isNaN(dateTime) ? Infinity : dateTime;
+
+  return Infinity;
 }
 
+export function getEventDueTimestamp(event: KpmbpEvent): number {
+  return getEventSortingTimestamp(event);
+}
+
+/**
+ * Sorts events strictly by EVENT DATE + START TIME in ascending order (paling hampir -> paling jauh).
+ */
 export function sortEventsByNearestDue(events: KpmbpEvent[]): KpmbpEvent[] {
   return [...events].sort((a, b) => {
-    const dueA = getEventDueTimestamp(a);
-    const dueB = getEventDueTimestamp(b);
-    if (dueA !== dueB) return dueA - dueB;
-    const dateA = a.date ? new Date(`${a.date}T00:00:00`).getTime() : Infinity;
-    const dateB = b.date ? new Date(`${b.date}T00:00:00`).getTime() : Infinity;
-    return dateA - dateB;
+    const timeA = getEventSortingTimestamp(a);
+    const timeB = getEventSortingTimestamp(b);
+    return timeA - timeB;
   });
 }
 

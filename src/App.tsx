@@ -13,7 +13,7 @@ import { AdminPortal } from './components/AdminPortal';
 import { AdminPinModal } from './components/AdminPinModal';
 import { DeleteConfirmationModal } from './components/DeleteConfirmationModal';
 import { Footer } from './components/Footer';
-import { sortEventsByNearestDue, getCategoryButtonClass, isEventArchived } from './utils/calendar';
+import { sortEventsByNearestDue, getCategoryButtonClass, isEventArchived, isOngoingProgram } from './utils/calendar';
 import { 
   subscribeToAllEvents,
   createNewEvent,
@@ -27,7 +27,7 @@ import {
   subscribeToHeroConfig,
   saveHeroConfig
 } from './services/dbAdapter';
-import { Sparkles, Calendar as CalendarIcon, Filter, Flame, CheckCircle2, ShieldCheck, Bookmark, Lock, KeyRound, Archive, Cloud } from 'lucide-react';
+import { Sparkles, Calendar as CalendarIcon, Filter, Flame, CheckCircle2, ShieldCheck, Bookmark, Lock, KeyRound, Archive, Cloud, Repeat, ArrowRight } from 'lucide-react';
 
 export default function App() {
   const [events, setEvents] = useState<KpmbpEvent[]>(() => {
@@ -75,6 +75,7 @@ export default function App() {
   const [selectedCategory, setSelectedCategory] = useState<EventCategory>('Semua');
   const [searchQuery, setSearchQuery] = useState('');
   const [showOnlySaved, setShowOnlySaved] = useState(false);
+  const [showOngoingOnly, setShowOngoingOnly] = useState(false);
 
   // Admin Access Security
   const [isAdminUnlocked, setIsAdminUnlocked] = useState<boolean>(() => {
@@ -231,8 +232,12 @@ export default function App() {
   const activeEvents = events.filter((e) => !isEventArchived(e));
   const archivedEvents = events.filter((e) => isEventArchived(e));
 
-  // Urgent events count (active only)
-  const urgentCount = activeEvents.filter(
+  // Ongoing Programs (Program Berterusan) vs One-Time Scheduled Events
+  const ongoingPrograms = activeEvents.filter((e) => isOngoingProgram(e));
+  const activeOneTimeEvents = activeEvents.filter((e) => !isOngoingProgram(e));
+
+  // Urgent events count (active one-time events closing soon)
+  const urgentCount = activeOneTimeEvents.filter(
     (e) => e.status === 'Registration Closing Soon' || (e.seatsLeft !== undefined && e.seatsLeft <= 5)
   ).length;
 
@@ -240,17 +245,27 @@ export default function App() {
     (e) => e.status === 'Registration Open' || e.status === 'Registration Closing Soon'
   ).length;
 
-  // Filtered & Sorted Events (by nearest due date)
-  const eventsToFilter = currentTab === 'archive' ? archivedEvents : activeEvents;
+  // Base list depending on tab & filter mode:
+  // - Archive: archived events
+  // - showOngoingOnly (Bahagian/Button Khas): Program Berterusan
+  // - Default Priority List: ONE-TIME EVENTS ONLY (Program Berterusan excluded)
+  let baseEventsList: KpmbpEvent[];
+  if (currentTab === 'archive') {
+    baseEventsList = archivedEvents;
+  } else if (showOngoingOnly) {
+    baseEventsList = ongoingPrograms;
+  } else {
+    baseEventsList = activeOneTimeEvents;
+  }
 
   const filteredEvents = sortEventsByNearestDue(
-    eventsToFilter.filter((evt) => {
+    baseEventsList.filter((evt) => {
       // Saved filter check
       if (showOnlySaved && !savedEventIds.includes(evt.id)) {
         return false;
       }
-      // Category check
-      if (selectedCategory !== 'Semua' && evt.category !== selectedCategory) {
+      // Category check (applied when not in dedicated ongoing mode)
+      if (!showOngoingOnly && selectedCategory !== 'Semua' && evt.category !== selectedCategory) {
         return false;
       }
       // Search query check
@@ -465,19 +480,52 @@ export default function App() {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/60 pb-3">
                   <div>
                     <h2 className="text-xs font-extrabold uppercase tracking-[0.2em] text-slate-400">
-                      AKAN DATANG DI KPMBP
+                      {showOngoingOnly ? 'PROGRAM BERTERUSAN' : 'AKAN DATANG DI KPMBP'}
                     </h2>
                   </div>
 
-                  {/* Category Quick Selector */}
+                  {/* Category Quick Selector & Program Berterusan Button Khas */}
                   <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-                    {(['Semua', 'Pertandingan', 'Program Pelajar', 'Sukan', 'Kebudayaan', 'Akademik', 'Bengkel', 'Kerjaya'] as EventCategory[]).map((cat) => (
+                    <button
+                      onClick={() => {
+                        setShowOngoingOnly(false);
+                        setSelectedCategory('Semua');
+                      }}
+                      className={`px-3 py-1 rounded-lg text-xs transition-all whitespace-nowrap ${getCategoryButtonClass(
+                        'Semua',
+                        selectedCategory === 'Semua' && !showOngoingOnly
+                      )}`}
+                    >
+                      Semua
+                    </button>
+
+                    {/* Button Khas: Program Berterusan */}
+                    <button
+                      onClick={() => {
+                        setShowOnlySaved(false);
+                        setShowOngoingOnly(!showOngoingOnly);
+                      }}
+                      className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
+                        showOngoingOnly
+                          ? 'bg-indigo-600 text-white shadow-xs'
+                          : 'bg-indigo-50/90 text-indigo-700 border border-indigo-200 hover:bg-indigo-100'
+                      }`}
+                      title="Paparkan Program Berterusan"
+                    >
+                      <Repeat className="w-3 h-3" />
+                      <span>Program Berterusan {ongoingPrograms.length > 0 && `(${ongoingPrograms.length})`}</span>
+                    </button>
+
+                    {(['Pertandingan', 'Program Pelajar', 'Sukan', 'Kebudayaan', 'Akademik', 'Bengkel', 'Kerjaya'] as EventCategory[]).map((cat) => (
                       <button
                         key={cat}
-                        onClick={() => setSelectedCategory(cat)}
+                        onClick={() => {
+                          setShowOngoingOnly(false);
+                          setSelectedCategory(cat);
+                        }}
                         className={`px-3 py-1 rounded-lg text-xs transition-all whitespace-nowrap ${getCategoryButtonClass(
                           cat,
-                          selectedCategory === cat
+                          selectedCategory === cat && !showOngoingOnly
                         )}`}
                       >
                         {cat}
@@ -485,6 +533,61 @@ export default function App() {
                     ))}
                   </div>
                 </div>
+
+                {/* Banner Khas: Program Berterusan (Apabila pengguna berada di senarai tarikh tunggal / keutamaan) */}
+                {!showOngoingOnly && ongoingPrograms.length > 0 && (
+                  <div className="bg-gradient-to-r from-indigo-50/90 via-sky-50/80 to-purple-50/80 border border-indigo-100 rounded-2xl p-3.5 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-xl bg-indigo-600 text-white shadow-xs shrink-0">
+                        <Repeat className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-xs font-bold text-slate-900">
+                            Bahagian Khas: Program Berterusan
+                          </h3>
+                          <span className="px-2 py-0.2 rounded-full text-[10px] font-black bg-indigo-100 text-indigo-700 border border-indigo-200">
+                            {ongoingPrograms.length} Program
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                          Program pengajian berkala & aktiviti sepanjang semester diasingkan di bahagian khas.
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setShowOnlySaved(false);
+                        setShowOngoingOnly(true);
+                      }}
+                      className="shrink-0 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <span>Lihat Program Berterusan</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+
+                {/* Header info bar apabila dalam mod Program Berterusan */}
+                {showOngoingOnly && (
+                  <div className="bg-indigo-50/70 border border-indigo-200/80 rounded-2xl p-3.5 flex items-center justify-between gap-3">
+                    <div>
+                      <h3 className="text-xs font-extrabold text-indigo-950 flex items-center gap-1.5">
+                        <Repeat className="w-3.5 h-3.5 text-indigo-600" />
+                        <span>Senarai Program Berterusan & Aktiviti Berkala</span>
+                      </h3>
+                      <p className="text-[11px] text-indigo-700 mt-0.5">
+                        Menampilkan program mingguan/berkala yang berjalan berterusan tanpa tarikh tamat tunggal.
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setShowOngoingOnly(false)}
+                      className="shrink-0 px-3 py-1 bg-white hover:bg-slate-50 text-indigo-600 border border-indigo-200 text-xs font-bold rounded-xl transition-all shadow-2xs"
+                    >
+                      ← Kembali ke Senarai Keutamaan
+                    </button>
+                  </div>
+                )}
 
                 {/* Event Cards Grid */}
                 {filteredEvents.length === 0 ? (
@@ -549,12 +652,15 @@ export default function App() {
                 </p>
               </div>
 
-              {/* Category Pills & Saved Toggle */}
+              {/* Category Pills & Saved Toggle & Program Berterusan Button Khas */}
               <div className="flex flex-wrap items-center gap-1.5 max-w-full">
                 <button
-                  onClick={() => setShowOnlySaved(!showOnlySaved)}
+                  onClick={() => {
+                    setShowOngoingOnly(false);
+                    setShowOnlySaved(!showOnlySaved);
+                  }}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                    showOnlySaved
+                    showOnlySaved && !showOngoingOnly
                       ? 'bg-amber-500 text-white shadow-xs'
                       : 'bg-white/80 text-amber-700 border border-amber-200 hover:bg-amber-50'
                   }`}
@@ -563,16 +669,33 @@ export default function App() {
                   <span>Disimpan ({savedEventIds.length})</span>
                 </button>
 
+                {/* Button Khas: Program Berterusan */}
+                <button
+                  onClick={() => {
+                    setShowOnlySaved(false);
+                    setShowOngoingOnly(!showOngoingOnly);
+                  }}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+                    showOngoingOnly
+                      ? 'bg-indigo-600 text-white shadow-xs'
+                      : 'bg-indigo-50/90 text-indigo-700 border border-indigo-200 hover:bg-indigo-100'
+                  }`}
+                >
+                  <Repeat className="w-3.5 h-3.5" />
+                  <span>Program Berterusan {ongoingPrograms.length > 0 && `(${ongoingPrograms.length})`}</span>
+                </button>
+
                 {(['Semua', 'Pertandingan', 'Program Pelajar', 'Sukan', 'Kebudayaan', 'Akademik', 'Bengkel', 'Kelab & Persatuan', 'Kerjaya', 'Institusi'] as EventCategory[]).map((cat) => (
                   <button
                     key={cat}
                     onClick={() => {
+                      setShowOngoingOnly(false);
                       setShowOnlySaved(false);
                       setSelectedCategory(cat);
                     }}
                     className={`px-3 py-1.5 rounded-xl text-xs transition-all whitespace-nowrap ${getCategoryButtonClass(
                       cat,
-                      selectedCategory === cat && !showOnlySaved
+                      selectedCategory === cat && !showOnlySaved && !showOngoingOnly
                     )}`}
                   >
                     {cat}
@@ -581,7 +704,7 @@ export default function App() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               {filteredEvents.map((event) => (
                 <EventCard
                   key={event.id}
@@ -625,7 +748,7 @@ export default function App() {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               {sortEventsByNearestDue(
                 events.filter((e) => e.status === 'Registration Closing Soon' || e.status === 'Registration Open')
               ).map((event) => (

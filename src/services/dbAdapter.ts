@@ -7,6 +7,7 @@ import {
   saveRegistrationToFirestore,
   subscribeToRegistrations as subscribeToFirestoreRegistrations,
   deleteRegistrationFromFirestore,
+  updateRegistrationInFirestore,
   getLocalEventsCache,
   saveLocalEventsCache,
   seedEventsIfEmpty,
@@ -137,6 +138,13 @@ export function subscribeToAllRegistrations(
  */
 export async function deleteExistingRegistration(id: string): Promise<void> {
   await deleteRegistrationFromFirestore(id);
+}
+
+/**
+ * Update student registration in Firestore & local cache
+ */
+export async function updateExistingRegistration(record: RegistrationRecord): Promise<void> {
+  await updateRegistrationInFirestore(record);
 }
 
 /**

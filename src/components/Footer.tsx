@@ -22,11 +22,11 @@ export const Footer: React.FC<FooterProps> = ({
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50/90 hover:bg-indigo-100/90 text-indigo-700 hover:text-indigo-900 border border-indigo-200/70 shadow-2xs transition-all font-semibold hover:scale-105 active:scale-95 group"
-          title="Sokong Ekosistem SYNCROZZ"
-          aria-label="Sokong SYNCROZZ"
+          title="Support SYNCROZZ"
+          aria-label="Support SYNCROZZ"
         >
           <Heart className="w-3.5 h-3.5 text-rose-500 fill-rose-500/20 group-hover:fill-rose-500 transition-colors" />
-          <span>Sokong SYNCROZZ</span>
+          <span>Support</span>
         </a>
 
         {/* Separator (Desktop) */}

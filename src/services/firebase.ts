@@ -16,6 +16,7 @@ import {
 } from 'firebase/firestore';
 import { KpmbpEvent, RegistrationRecord, HeroConfig, DEFAULT_HERO_CONFIG } from '../types';
 import { INITIAL_EVENTS } from '../data/initialEvents';
+import { sortEventsByNearestDue } from '../utils/calendar';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 // Initialize Firebase App
@@ -27,11 +28,12 @@ const designatedDbId = firebaseConfig.firestoreDatabaseId && firebaseConfig.fire
   ? firebaseConfig.firestoreDatabaseId
   : undefined;
 
-// Initialize primary and fallback instances with ignoreUndefinedProperties
+// Initialize primary and fallback instances with ignoreUndefinedProperties & auto-detect long polling
 let primaryDb;
 try {
   primaryDb = initializeFirestore(app, {
     ignoreUndefinedProperties: true,
+    experimentalAutoDetectLongPolling: true,
   }, designatedDbId);
 } catch {
   primaryDb = designatedDbId ? getFirestore(app, designatedDbId) : getFirestore(app);
@@ -241,9 +243,9 @@ export function subscribeToEvents(
           });
         });
 
-        eventsList.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
-        saveLocalEventsCache(eventsList);
-        onUpdate(eventsList);
+        const sortedEvents = sortEventsByNearestDue(eventsList);
+        saveLocalEventsCache(sortedEvents);
+        onUpdate(sortedEvents);
       },
       (err) => {
         // Quota exceeded or connection error handled gracefully
@@ -415,6 +417,26 @@ export async function deleteRegistrationFromFirestore(id: string): Promise<void>
     await deleteDoc(docRef);
   } catch (err: any) {
     console.warn('Registration deleted from local cache:', err?.message);
+  }
+}
+
+/**
+ * Update an existing registration in Firestore and local cache
+ */
+export async function updateRegistrationInFirestore(record: RegistrationRecord): Promise<void> {
+  const localList = getLocalRegistrationsCache();
+  const nextList = localList.map((r) => (r.id === record.id ? record : r));
+  saveLocalRegistrationsCache(nextList);
+
+  try {
+    const docRef = doc(db, REGISTRATIONS_COLLECTION, record.id);
+    const payload = sanitizeForFirestore({
+      ...record,
+      updatedAt: new Date().toISOString()
+    });
+    await setDoc(docRef, payload, { merge: true });
+  } catch (err: any) {
+    console.warn('Registration updated in local cache (Cloud sync notice):', err?.message);
   }
 }
 

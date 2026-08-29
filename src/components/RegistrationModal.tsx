@@ -1,7 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { KpmbpEvent, RegistrationRecord } from '../types';
 import { formatDateMalay, buildRegistrationWhatsAppUrl } from '../utils/calendar';
-import { X, CheckCircle, Ticket, User, Mail, Phone, ExternalLink, QrCode, Download, MessageCircle, Send } from 'lucide-react';
+import { 
+  maskFullNameLive, 
+  normalizeFullName, 
+  validateFullName,
+  maskStudentId, 
+  normalizeStudentId, 
+  validateStudentId,
+  maskPhoneNumber, 
+  normalizePhoneNumber, 
+  validatePhoneNumber,
+  normalizeEmail,
+  validateEmail
+} from '../utils/formMasking';
+import { X, CheckCircle, Ticket, User, Mail, Phone, QrCode, Download, MessageCircle, Send, AlertCircle } from 'lucide-react';
 
 interface RegistrationModalProps {
   event: KpmbpEvent | null;
@@ -19,6 +32,7 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [programCode, setProgramCode] = useState('DLM');
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [submittedPass, setSubmittedPass] = useState<RegistrationRecord | null>(null);
 
   useEffect(() => {
@@ -39,18 +53,75 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
 
   const { full: fullDateMalay } = formatDateMalay(event.date);
 
+  // Live Change Handlers
+  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const masked = maskFullNameLive(e.target.value);
+    setStudentName(masked);
+    if (formErrors.studentName) {
+      setFormErrors((prev) => ({ ...prev, studentName: '' }));
+    }
+  };
+
+  const handleStudentIdChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const masked = maskStudentId(e.target.value);
+    setStudentId(masked);
+    if (formErrors.studentId) {
+      setFormErrors((prev) => ({ ...prev, studentId: '' }));
+    }
+  };
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const masked = maskPhoneNumber(e.target.value);
+    setPhone(masked);
+    if (formErrors.phone) {
+      setFormErrors((prev) => ({ ...prev, phone: '' }));
+    }
+  };
+
+  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setEmail(e.target.value);
+    if (formErrors.email) {
+      setFormErrors((prev) => ({ ...prev, email: '' }));
+    }
+  };
+
+  // Form Submission Validation & Normalization
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!studentName || !studentId || !email) return;
+
+    // 1. Normalize all inputs
+    const normalizedName = normalizeFullName(studentName);
+    const normalizedId = normalizeStudentId(studentId);
+    const normalizedPhone = normalizePhoneNumber(phone);
+    const normalizedMail = normalizeEmail(email);
+
+    // 2. Validate all fields
+    const nameVal = validateFullName(normalizedName);
+    const idVal = validateStudentId(normalizedId);
+    const phoneVal = validatePhoneNumber(normalizedPhone);
+    const emailVal = validateEmail(normalizedMail);
+
+    const errors: Record<string, string> = {};
+    if (!nameVal.isValid) errors.studentName = nameVal.error || 'Nama tidak sah';
+    if (!idVal.isValid) errors.studentId = idVal.error || 'ID Pelajar tidak sah';
+    if (!phoneVal.isValid) errors.phone = phoneVal.error || 'No. Telefon tidak sah';
+    if (!emailVal.isValid) errors.email = emailVal.error || 'Emel tidak sah';
+
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      return;
+    }
+
+    setFormErrors({});
 
     const newRecord: RegistrationRecord = {
       id: `REG-${Math.floor(100000 + Math.random() * 900000)}`,
       eventId: event.id,
       eventTitle: event.title,
-      studentName,
-      studentId: studentId.toUpperCase(),
-      email,
-      phone,
+      studentName: normalizedName,
+      studentId: normalizedId,
+      email: normalizedMail,
+      phone: normalizedPhone,
       programCode,
       timestamp: new Date().toLocaleString('ms-MY', { dateStyle: 'medium', timeStyle: 'short' })
     };
@@ -159,7 +230,7 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
                   </div>
                   <div>
                     <span className="text-[10px] text-slate-400 font-bold uppercase block">No. Matrik / ID</span>
-                    <span className="font-bold text-slate-800">{submittedPass.studentId}</span>
+                    <span className="font-bold text-slate-800 font-mono">{submittedPass.studentId}</span>
                   </div>
                   <div>
                     <span className="text-[10px] text-slate-400 font-bold uppercase block">Program</span>
@@ -196,38 +267,72 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
               </button>
             </div>
           ) : (
-            /* Registration Form */
-            <form onSubmit={handleSubmit} className="space-y-3">
+            /* Registration Form with Live Input Masking */
+            <form onSubmit={handleSubmit} className="space-y-3.5" noValidate>
+              
+              {/* Field 1: Nama Penuh (Auto UPPERCASE & Clean Spaces) */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Nama Penuh Peserta *
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold text-slate-700">
+                    Nama Penuh Peserta <span className="text-rose-500">*</span>
+                  </label>
+                  <span className="text-[10px] text-slate-400 font-medium">Auto-UPPERCASE</span>
+                </div>
                 <div className="relative">
                   <input
                     type="text"
                     required
                     value={studentName}
-                    onChange={(e) => setStudentName(e.target.value)}
-                    placeholder="Contoh: Muhammad Amirul Bin Rosli"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                    onChange={handleNameChange}
+                    onBlur={() => setStudentName(normalizeFullName(studentName))}
+                    placeholder="NUR AINA BATRISYIA BINTI ZULHILMI"
+                    className={`w-full bg-slate-50 border rounded-xl pl-9 pr-3 py-2 text-xs font-semibold focus:bg-white focus:outline-none transition-colors uppercase ${
+                      formErrors.studentName 
+                        ? 'border-rose-300 ring-2 ring-rose-500/10' 
+                        : 'border-slate-200 focus:ring-2 focus:ring-indigo-500/20'
+                    }`}
                   />
                   <User className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
                 </div>
+                {formErrors.studentName && (
+                  <p className="text-[11px] text-rose-600 font-bold mt-1 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3" />
+                    <span>{formErrors.studentName}</span>
+                  </p>
+                )}
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              {/* Field 2 & 3: No. Matrik (Masked XXX-XXXX-XXX) & Program */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    No. Matrik / ID Staf *
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-bold text-slate-700">
+                      No. Matrik / ID <span className="text-rose-500">*</span>
+                    </label>
+                    <span className="text-[10px] text-indigo-600 font-mono font-bold">XXX-XXXX-XXX</span>
+                  </div>
                   <input
                     type="text"
                     required
                     value={studentId}
-                    onChange={(e) => setStudentId(e.target.value)}
-                    placeholder="PDA-2503-008"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 uppercase"
+                    onChange={handleStudentIdChange}
+                    onBlur={() => setStudentId(normalizeStudentId(studentId))}
+                    placeholder="PDA-2502-011"
+                    maxLength={12}
+                    className={`w-full bg-slate-50 border rounded-xl px-3 py-2 text-xs font-mono font-bold uppercase focus:bg-white focus:outline-none transition-colors ${
+                      formErrors.studentId 
+                        ? 'border-rose-300 ring-2 ring-rose-500/10' 
+                        : 'border-slate-200 focus:ring-2 focus:ring-indigo-500/20'
+                    }`}
                   />
+                  {formErrors.studentId ? (
+                    <p className="text-[11px] text-rose-600 font-bold mt-1 flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3 shrink-0" />
+                      <span>{formErrors.studentId}</span>
+                    </p>
+                  ) : (
+                    <span className="text-[10px] text-slate-400 block mt-0.5">Taip digit sahaja (Auto formatting)</span>
+                  )}
                 </div>
 
                 <div>
@@ -237,10 +342,12 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
                   <select
                     value={programCode}
                     onChange={(e) => setProgramCode(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
                   >
                     <option value="Diploma in Logistik (DLM)">Diploma in Logistik (DLM)</option>
                     <option value="Diploma in Accounting (DIA)">Diploma in Accounting (DIA)</option>
+                    <option value="Diploma in Business Studies (DBS)">Diploma in Business Studies (DBS)</option>
+                    <option value="Diploma in Islamic Banking (DIB)">Diploma in Islamic Banking (DIB)</option>
                     <option value="Pra Diploma (PRA DIP)">Pra Diploma (PRA DIP)</option>
                     <option value="Staf / Pensyarah KPMBP">Staf / Pensyarah KPMBP</option>
                     <option value="Lain-Lain">Lain-Lain</option>
@@ -248,44 +355,73 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
                 </div>
               </div>
 
+              {/* Field 4: Emel Siswa */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Emel Siswa / Rasmi *
+                  Emel Siswa / Rasmi <span className="text-rose-500">*</span>
                 </label>
                 <div className="relative">
                   <input
                     type="email"
                     required
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="amirul@bpenawar.kpm.edu.my"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                    onChange={handleEmailChange}
+                    onBlur={() => setEmail(normalizeEmail(email))}
+                    placeholder="pelajar@gapps.kpm.edu.my"
+                    className={`w-full bg-slate-50 border rounded-xl pl-9 pr-3 py-2 text-xs font-medium focus:bg-white focus:outline-none transition-colors ${
+                      formErrors.email 
+                        ? 'border-rose-300 ring-2 ring-rose-500/10' 
+                        : 'border-slate-200 focus:ring-2 focus:ring-indigo-500/20'
+                    }`}
                   />
                   <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
                 </div>
+                {formErrors.email && (
+                  <p className="text-[11px] text-rose-600 font-bold mt-1 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3" />
+                    <span>{formErrors.email}</span>
+                  </p>
+                )}
               </div>
 
+              {/* Field 5: No. Telefon WhatsApp (Auto Masking) */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  No. Telefon WhatsApp *
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold text-slate-700">
+                    No. Telefon WhatsApp <span className="text-rose-500">*</span>
+                  </label>
+                  <span className="text-[10px] text-emerald-700 font-mono font-bold">01X-XXXXXXX / 601X</span>
+                </div>
                 <div className="relative">
                   <input
                     type="tel"
                     required
                     value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="0123456789"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                    onChange={handlePhoneChange}
+                    onBlur={() => setPhone(normalizePhoneNumber(phone))}
+                    placeholder="014-5313756"
+                    className={`w-full bg-slate-50 border rounded-xl pl-9 pr-3 py-2 text-xs font-medium focus:bg-white focus:outline-none transition-colors ${
+                      formErrors.phone 
+                        ? 'border-rose-300 ring-2 ring-rose-500/10' 
+                        : 'border-slate-200 focus:ring-2 focus:ring-indigo-500/20'
+                    }`}
                   />
                   <Phone className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
                 </div>
+                {formErrors.phone ? (
+                  <p className="text-[11px] text-rose-600 font-bold mt-1 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3 shrink-0" />
+                    <span>{formErrors.phone}</span>
+                  </p>
+                ) : (
+                  <span className="text-[10px] text-slate-400 block mt-0.5">Sistem memformatkan nombor secara langsung semasa menaip</span>
+                )}
               </div>
 
               <div className="pt-3">
                 <button
                   type="submit"
-                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl text-xs font-bold shadow-lg shadow-indigo-200 transition-all flex items-center justify-center gap-2"
+                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl text-xs font-bold shadow-lg shadow-indigo-200 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99]"
                 >
                   <span>Sahkan & Dapatkan Pautan WhatsApp</span>
                   <MessageCircle className="w-4 h-4" />
@@ -299,4 +435,5 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
     </div>
   );
 };
+
 

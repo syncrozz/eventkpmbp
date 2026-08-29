@@ -15,11 +15,30 @@ import {
 import { 
   subscribeToAllRegistrations, 
   deleteExistingRegistration, 
+  updateExistingRegistration,
   getActiveBackendLabel, 
   getActiveBackendType 
 } from '../services/dbAdapter';
 import { formatDateDMY, formatDeadlineMalay, getCategoryBadgeClass, isOngoingProgram } from '../utils/calendar';
 import { optimizeEventImage } from '../utils/imageOptimizer';
+import { 
+  formatMalaysiaWhatsAppNumber, 
+  generateRegistrationWhatsAppMessage, 
+  generateRegistrationWhatsAppUrl 
+} from '../utils/whatsappHelper';
+import { 
+  maskFullNameLive, 
+  normalizeFullName, 
+  validateFullName, 
+  maskStudentId, 
+  normalizeStudentId, 
+  validateStudentId, 
+  maskPhoneNumber, 
+  normalizePhoneNumber, 
+  validatePhoneNumber, 
+  normalizeEmail, 
+  validateEmail 
+} from '../utils/formMasking';
 import { 
   exportEventsToCSV, 
   exportRegistrationsToCSV, 
@@ -31,7 +50,7 @@ import {
   Image as ImageIcon, Upload, Link as LinkIcon, X, Eye, Cloud, Users, 
   Search, Phone, Mail, Calendar, Download, RefreshCw, Loader2, Database, Copy, CheckCheck, WifiOff, Globe, ExternalLink,
   Repeat, Clock, Layers, FileSpreadsheet, FileUp, FileDown, CheckCircle2, FileText, ArrowUpDown, HelpCircle,
-  SlidersHorizontal, ArrowLeftRight, Star, Flame, Shield, BookOpen, Compass, Save, RotateCcw, MonitorPlay
+  SlidersHorizontal, ArrowLeftRight, Star, Flame, Shield, BookOpen, Compass, Save, RotateCcw, MonitorPlay, MessageSquare, Send
 } from 'lucide-react';
 import { AdminHeroManager } from './AdminHeroManager';
 
@@ -64,6 +83,15 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const [registrations, setRegistrations] = useState<RegistrationRecord[]>([]);
   const [regSearchQuery, setRegSearchQuery] = useState('');
   const [selectedRegEventId, setSelectedRegEventId] = useState<string>('all');
+
+  // Registration Edit & Delete States
+  const [editingRegistration, setEditingRegistration] = useState<RegistrationRecord | null>(null);
+  const [isSavingReg, setIsSavingReg] = useState(false);
+  const [deleteConfirmReg, setDeleteConfirmReg] = useState<RegistrationRecord | null>(null);
+  const [isDeletingReg, setIsDeletingReg] = useState(false);
+  const [copiedRegId, setCopiedRegId] = useState<string | null>(null);
+  const [regActionToast, setRegActionToast] = useState<string | null>(null);
+  const [previewWhatsappReg, setPreviewWhatsappReg] = useState<RegistrationRecord | null>(null);
 
   // Hero Carousel Configuration State
   const [adminHeroConfig, setAdminHeroConfig] = useState<HeroConfig>(() => {
@@ -170,6 +198,99 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       alert('Ralat semasa import data: ' + (err?.message || 'Sila cuba lagi.'));
     } finally {
       setIsImporting(false);
+    }
+  };
+
+  // --- Registration Management Handlers ---
+  const handleCopyWhatsAppMessage = (reg: RegistrationRecord) => {
+    const matchedEvent = events.find(e => e.id === reg.eventId);
+    const msg = generateRegistrationWhatsAppMessage(reg, matchedEvent?.title || reg.eventTitle);
+    navigator.clipboard.writeText(msg);
+    setCopiedRegId(reg.id);
+    setRegActionToast(`Mesej WhatsApp pengesahan untuk ${reg.studentName} disalin ke clipboard!`);
+    setTimeout(() => {
+      setCopiedRegId(null);
+      setRegActionToast(null);
+    }, 3000);
+  };
+
+  const handleStartEditRegistration = (reg: RegistrationRecord) => {
+    setEditingRegistration({ ...reg });
+  };
+
+  const handleSaveEditedRegistration = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingRegistration) return;
+
+    const normalizedName = normalizeFullName(editingRegistration.studentName);
+    const normalizedId = normalizeStudentId(editingRegistration.studentId);
+    const normalizedPhone = normalizePhoneNumber(editingRegistration.phone);
+    const normalizedMail = editingRegistration.email ? normalizeEmail(editingRegistration.email) : '';
+
+    const nameVal = validateFullName(normalizedName);
+    const idVal = validateStudentId(normalizedId);
+    const phoneVal = validatePhoneNumber(normalizedPhone);
+
+    if (!nameVal.isValid) {
+      alert(nameVal.error || 'Sila masukkan nama penuh peserta yang sah.');
+      return;
+    }
+    if (!idVal.isValid) {
+      alert(idVal.error || 'Format No. ID / Matrik tidak sah. Sila gunakan format XXX-XXXX-XXX (Contoh: PDA-2502-011).');
+      return;
+    }
+    if (!phoneVal.isValid) {
+      alert(phoneVal.error || 'Sila masukkan nombor telefon yang sah.');
+      return;
+    }
+    if (normalizedMail) {
+      const emailVal = validateEmail(normalizedMail);
+      if (!emailVal.isValid) {
+        alert(emailVal.error || 'Sila masukkan format emel yang sah.');
+        return;
+      }
+    }
+
+    setIsSavingReg(true);
+    try {
+      // Find event title if eventId changed
+      const matchedEvent = events.find(e => e.id === editingRegistration.eventId);
+      const updatedReg: RegistrationRecord = {
+        ...editingRegistration,
+        studentName: normalizedName,
+        studentId: normalizedId,
+        phone: normalizedPhone,
+        email: normalizedMail,
+        eventTitle: matchedEvent ? matchedEvent.title : editingRegistration.eventTitle
+      };
+
+      await updateExistingRegistration(updatedReg);
+      setRegistrations((prev) => prev.map((r) => (r.id === updatedReg.id ? updatedReg : r)));
+      setEditingRegistration(null);
+      setRegActionToast(`Rekod pendaftaran ${updatedReg.studentName} berjaya dikemaskini!`);
+      setTimeout(() => setRegActionToast(null), 3500);
+    } catch (err: any) {
+      console.error('Error updating registration:', err);
+      alert('Ralat semasa mengemaskini pendaftaran: ' + (err?.message || 'Sila cuba lagi.'));
+    } finally {
+      setIsSavingReg(false);
+    }
+  };
+
+  const handleConfirmDeleteRegistration = async () => {
+    if (!deleteConfirmReg) return;
+    setIsDeletingReg(true);
+    try {
+      await deleteExistingRegistration(deleteConfirmReg.id);
+      setRegistrations((prev) => prev.filter((r) => r.id !== deleteConfirmReg.id));
+      setRegActionToast(`Rekod pendaftaran ${deleteConfirmReg.studentName} berjaya dipadam.`);
+      setDeleteConfirmReg(null);
+      setTimeout(() => setRegActionToast(null), 3500);
+    } catch (err: any) {
+      console.error('Error deleting registration:', err);
+      alert('Ralat semasa memadam pendaftaran: ' + (err?.message || 'Sila cuba lagi.'));
+    } finally {
+      setIsDeletingReg(false);
     }
   };
 
@@ -450,12 +571,17 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
         </div>
       </div>
 
-      {/* Admin Sub Navigation Tabs & Right-Aligned Action Buttons */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200/80 pb-2">
-        <div className="flex items-center gap-2">
+      {/* Admin Navigation & Action Toolbar (Organized in 2 Structured Rows) */}
+      <div className="bg-white/70 backdrop-blur-xl border border-slate-200/80 rounded-3xl p-3.5 sm:p-4 shadow-sm space-y-3">
+        
+        {/* ROW 1: Primary Navigation Tabs */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Tab 1: Senarai Acara */}
           <button
+            id="admin-tab-events"
+            type="button"
             onClick={() => setActiveAdminTab('events')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
               activeAdminTab === 'events'
                 ? 'bg-slate-900 text-white shadow-sm'
                 : 'text-slate-600 hover:bg-slate-100'
@@ -463,15 +589,18 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
           >
             <span>Senarai Acara</span>
             <span className={`px-2 py-0.5 rounded-full text-[10px] ${
-              activeAdminTab === 'events' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
+              activeAdminTab === 'events' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700 font-bold'
             }`}>
               {events.length}
             </span>
           </button>
 
+          {/* Tab 2: Rekod Pendaftaran Peserta */}
           <button
+            id="admin-tab-registrations"
+            type="button"
             onClick={() => setActiveAdminTab('registrations')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
               activeAdminTab === 'registrations'
                 ? 'bg-slate-900 text-white shadow-sm'
                 : 'text-slate-600 hover:bg-slate-100'
@@ -479,16 +608,19 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
           >
             <Users className="w-3.5 h-3.5 text-emerald-400" />
             <span>Rekod Pendaftaran Peserta</span>
-            <span className={`px-2 py-0.5 rounded-full text-[10px] ${
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
               activeAdminTab === 'registrations' ? 'bg-emerald-500 text-white' : 'bg-emerald-100 text-emerald-800'
             }`}>
               {registrations.length}
             </span>
           </button>
 
+          {/* Tab 3: Hero Carousel & Komunikasi */}
           <button
+            id="admin-tab-hero"
+            type="button"
             onClick={() => setActiveAdminTab('hero')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
               activeAdminTab === 'hero'
                 ? 'bg-slate-900 text-white shadow-sm'
                 : 'text-slate-600 hover:bg-slate-100'
@@ -504,8 +636,9 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
           </button>
         </div>
 
+        {/* ROW 2: Primary Management & Creation Action Buttons */}
         {!isCreating && !editingEvent && (
-          <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
+          <div className="flex flex-wrap items-center gap-2 pt-2.5 border-t border-slate-200/70">
             {/* Hidden CSV File Input */}
             <input
               ref={csvFileInputRef}
@@ -515,78 +648,80 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
               onChange={handleCsvFileSelect}
             />
 
-            {/* CSV Export & Import Action Buttons for Events */}
-            {activeAdminTab === 'events' && (
-              <div className="flex items-center gap-1.5 bg-slate-100/90 p-1 rounded-2xl border border-slate-200/80">
-                <button
-                  type="button"
-                  onClick={handleExportEventsCSV}
-                  className="bg-white hover:bg-slate-50 text-slate-800 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-2xs border border-slate-200/80 cursor-pointer"
-                  title="Eksport sandaran semua acara KPMBP ke fail CSV / Excel"
-                >
-                  <FileDown className="w-3.5 h-3.5 text-indigo-600" />
-                  <span>Eksport CSV</span>
-                  <span className="bg-indigo-50 text-indigo-700 text-[10px] px-1.5 py-0.2 rounded font-extrabold">
-                    {events.length}
-                  </span>
-                </button>
+            {/* 1. [ Eksport Pendaftaran ] */}
+            <button
+              id="admin-btn-export-registrations"
+              type="button"
+              onClick={handleExportRegistrationsCSV}
+              className="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all border border-emerald-200/80 cursor-pointer shadow-2xs"
+              title="Eksport senarai pendaftaran pelajar ke fail CSV / Excel"
+            >
+              <FileDown className="w-3.5 h-3.5 text-emerald-700" />
+              <span>Eksport Pendaftaran</span>
+              <span className="bg-emerald-200/80 text-emerald-900 text-[10px] px-1.5 py-0.2 rounded font-extrabold">
+                {registrations.length}
+              </span>
+            </button>
 
-                <button
-                  type="button"
-                  onClick={() => csvFileInputRef.current?.click()}
-                  className="bg-indigo-50 hover:bg-indigo-100 text-indigo-800 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all border border-indigo-200/80 cursor-pointer"
-                  title="Import acara atau pulihkan sandaran daripada fail CSV"
-                >
-                  <FileUp className="w-3.5 h-3.5 text-indigo-700" />
-                  <span>Import CSV</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleDownloadTemplate}
-                  className="text-slate-500 hover:text-slate-800 p-1.5 rounded-xl text-xs transition-colors hover:bg-slate-200/60"
-                  title="Muat turun templat format CSV kosong (Contoh)"
-                >
-                  <HelpCircle className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            )}
-
-            {/* CSV Export for Registrations Tab */}
-            {activeAdminTab === 'registrations' && (
+            {/* CSV Backup & Import Tools for Events */}
+            <div className="flex items-center gap-1 bg-slate-100/90 p-0.5 rounded-xl border border-slate-200/80">
               <button
                 type="button"
-                onClick={handleExportRegistrationsCSV}
-                className="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all border border-emerald-200/80 cursor-pointer shadow-2xs"
-                title="Eksport senarai pendaftaran pelajar ke fail CSV / Excel"
+                onClick={handleExportEventsCSV}
+                className="hover:bg-white text-slate-700 hover:text-slate-900 px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-all cursor-pointer"
+                title="Eksport semua acara ke CSV"
               >
-                <FileDown className="w-3.5 h-3.5 text-emerald-700" />
-                <span>Eksport Pendaftaran (CSV)</span>
-                <span className="bg-emerald-200/80 text-emerald-900 text-[10px] px-1.5 py-0.2 rounded font-extrabold">
-                  {registrations.length}
-                </span>
+                <FileSpreadsheet className="w-3 h-3 text-indigo-600" />
+                <span>Eksport Acara</span>
               </button>
-            )}
+              <button
+                type="button"
+                onClick={() => csvFileInputRef.current?.click()}
+                className="hover:bg-white text-slate-700 hover:text-slate-900 px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-all cursor-pointer"
+                title="Import acara daripada CSV"
+              >
+                <FileUp className="w-3 h-3 text-indigo-700" />
+                <span>Import</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleDownloadTemplate}
+                className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg text-xs transition-colors"
+                title="Muat turun templat CSV kosong"
+              >
+                <HelpCircle className="w-3 h-3" />
+              </button>
+            </div>
 
+            {/* 2. [ Muat Semula Sampel ] */}
             {onSeedSampleData && (
               <button
+                id="admin-btn-seed-sample"
                 type="button"
                 onClick={onSeedSampleData}
                 className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all border border-slate-200/80 cursor-pointer"
                 title="Muat semula set acara sampel default KPMBP"
               >
-                <RefreshCw className="w-3.5 h-3.5" />
+                <RefreshCw className="w-3.5 h-3.5 text-slate-600" />
                 <span>Muat Semula Sampel</span>
               </button>
             )}
+
+            {/* 3. [ Cipta Acara Sekali ] */}
             <button
+              id="admin-btn-create-event"
+              type="button"
               onClick={() => handleStartCreate('ONE_TIME_EVENT')}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold shadow-md shadow-indigo-200 flex items-center gap-1.5 transition-all cursor-pointer"
+              className="bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold shadow-md shadow-indigo-200 flex items-center gap-1.5 transition-all cursor-pointer sm:ml-auto"
             >
               <Plus className="w-4 h-4" />
               <span>Cipta Acara Sekali</span>
             </button>
+
+            {/* 4. [ Cipta Program Berterusan ] */}
             <button
+              id="admin-btn-create-ongoing"
+              type="button"
               onClick={() => handleStartCreate('ONGOING_PROGRAM')}
               className="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold shadow-md shadow-emerald-200 flex items-center gap-1.5 transition-all cursor-pointer"
             >
@@ -1166,8 +1301,9 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                       type="text"
                       required
                       value={organiserWhatsApp}
-                      onChange={(e) => setOrganiserWhatsApp(e.target.value)}
-                      placeholder="Contoh: 0123456789 / 60123456789"
+                      onChange={(e) => setOrganiserWhatsApp(maskPhoneNumber(e.target.value))}
+                      onBlur={() => setOrganiserWhatsApp(normalizePhoneNumber(organiserWhatsApp))}
+                      placeholder="014-5313756 / 6014-5313756"
                       className="w-full bg-white border border-indigo-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
                     />
                     <p className="text-[10px] text-indigo-800 mt-1">
@@ -1608,7 +1744,21 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
       {/* Tab 2: Registrations Table (From Firestore Cloud) */}
       {activeAdminTab === 'registrations' && (
-        <div className="bg-white/60 backdrop-blur-xl border border-white/80 rounded-3xl p-6 shadow-sm space-y-4">
+        <div id="admin-registrations-section" className="bg-white/60 backdrop-blur-xl border border-white/80 rounded-3xl p-6 shadow-sm space-y-4">
+          
+          {/* Toast Notification */}
+          {regActionToast && (
+            <div className="bg-emerald-600 text-white text-xs font-bold px-4 py-2.5 rounded-2xl shadow-lg flex items-center justify-between gap-2">
+              <span className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-200 shrink-0" />
+                <span>{regActionToast}</span>
+              </span>
+              <button onClick={() => setRegActionToast(null)} className="text-emerald-200 hover:text-white p-1">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
@@ -1616,7 +1766,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                 <span>Rekod Pendaftaran Pelajar (Disimpan di Firebase)</span>
               </h3>
               <p className="text-xs text-slate-500 mt-0.5">
-                Semua pendaftaran yang dihantar oleh pelajar direkodkan terus secara masa nyata.
+                Pengurusan pendaftaran pelajar: Klik WhatsApp untuk auto terus ke nombor <span className="font-semibold text-emerald-700">wa.me/6...</span> bersama draf Maklumat Pendaftaran bagi pengesahan.
               </p>
             </div>
 
@@ -1625,7 +1775,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                 <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
-                  placeholder="Cari nama, no. ID, email..."
+                  placeholder="Cari nama, no. ID, email, telefon..."
                   value={regSearchQuery}
                   onChange={(e) => setRegSearchQuery(e.target.value)}
                   className="bg-white border border-slate-200 rounded-xl pl-8 pr-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
@@ -1657,16 +1807,17 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
+              <table id="admin-registrations-table" className="w-full text-left text-xs border-collapse">
                 <thead>
                   <tr className="border-b border-slate-200/80 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
                     <th className="pb-3 pr-2">Kod Pas / ID</th>
                     <th className="pb-3 px-2">Nama Pelajar</th>
                     <th className="pb-3 px-2">No. ID / Matrik</th>
                     <th className="pb-3 px-2">Program</th>
-                    <th className="pb-3 px-2">WhatsApp / Email</th>
+                    <th className="pb-3 px-2">Direct WhatsApp (wa.me/6) & Maklumat</th>
                     <th className="pb-3 px-2">Acara</th>
-                    <th className="pb-3 pl-2 text-right">Tarikh Masa</th>
+                    <th className="pb-3 px-2 text-slate-500">Tarikh Daftar</th>
+                    <th className="pb-3 pl-2 text-right">Tindakan</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 font-medium">
@@ -1685,50 +1836,350 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                       }
                       return true;
                     })
-                    .map((reg) => (
-                      <tr key={reg.id} className="hover:bg-slate-50/80 transition-colors">
-                        <td className="py-3 pr-2 font-mono font-bold text-indigo-600">
-                          {reg.id}
-                        </td>
-                        <td className="py-3 px-2 font-bold text-slate-900">
-                          {reg.studentName}
-                        </td>
-                        <td className="py-3 px-2 font-mono text-slate-700 font-semibold">
-                          {reg.studentId}
-                        </td>
-                        <td className="py-3 px-2">
-                          <span className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded text-[10px] font-bold">
-                            {reg.programCode}
-                          </span>
-                        </td>
-                        <td className="py-3 px-2 text-slate-600">
-                          <div className="space-y-0.5">
+                    .map((reg) => {
+                      const waUrl = generateRegistrationWhatsAppUrl(reg);
+                      const isCopied = copiedRegId === reg.id;
+
+                      return (
+                        <tr key={reg.id} className="hover:bg-slate-50/80 transition-colors">
+                          <td className="py-3 pr-2 font-mono font-bold text-indigo-600 whitespace-nowrap">
+                            {reg.id}
+                          </td>
+                          <td className="py-3 px-2 font-bold text-slate-900">
+                            {reg.studentName}
+                          </td>
+                          <td className="py-3 px-2 font-mono text-slate-700 font-semibold whitespace-nowrap">
+                            {reg.studentId}
+                          </td>
+                          <td className="py-3 px-2 whitespace-nowrap">
+                            <span className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded text-[10px] font-bold">
+                              {reg.programCode}
+                            </span>
+                          </td>
+                          <td className="py-3 px-2 text-slate-600">
+                            <div className="space-y-1">
+                              {reg.phone ? (
+                                <div className="flex items-center gap-1.5">
+                                  <a
+                                    id={`wa-btn-${reg.id}`}
+                                    href={waUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold border border-emerald-200/90 transition-all shadow-2xs group hover:shadow-xs"
+                                    title="Klik untuk direct WhatsApp wa.me/6 dengan draf Maklumat Pendaftaran lengkap"
+                                  >
+                                    <Phone className="w-3 h-3 text-emerald-600 group-hover:scale-110 transition-transform" />
+                                    <span>{reg.phone}</span>
+                                    <ExternalLink className="w-2.5 h-2.5 text-emerald-600/70" />
+                                  </a>
+                                  
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCopyWhatsAppMessage(reg)}
+                                    className={`p-1.5 rounded-lg border transition-all ${
+                                      isCopied 
+                                        ? 'bg-emerald-100 text-emerald-800 border-emerald-300' 
+                                        : 'bg-slate-50 hover:bg-slate-100 text-slate-500 hover:text-slate-800 border-slate-200/80'
+                                    }`}
+                                    title="Salin templat teks pendaftaran untuk dihantar ke WhatsApp"
+                                  >
+                                    {isCopied ? <Check className="w-3 h-3 text-emerald-700" /> : <Copy className="w-3 h-3" />}
+                                  </button>
+                                </div>
+                              ) : (
+                                <span className="text-slate-400 text-[11px]">-</span>
+                              )}
+                              {reg.email && (
+                                <div className="text-[10px] text-slate-400 flex items-center gap-1">
+                                  <Mail className="w-2.5 h-2.5 text-slate-400" />
+                                  <span>{reg.email}</span>
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          <td className="py-3 px-2 text-slate-800 font-semibold max-w-[180px] truncate" title={reg.eventTitle || reg.eventId}>
+                            {reg.eventTitle || reg.eventId}
+                          </td>
+                          <td className="py-3 px-2 text-slate-500 text-[11px] whitespace-nowrap">
+                            {reg.timestamp || '-'}
+                          </td>
+                          <td className="py-3 pl-2 text-right whitespace-nowrap space-x-1.5">
+                            {/* Direct WhatsApp Button */}
                             {reg.phone && (
                               <a
-                                href={`https://wa.me/${reg.phone.replace(/[^0-9]/g, '')}`}
+                                href={waUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-emerald-700 font-bold hover:underline flex items-center gap-1"
+                                className="inline-flex p-1.5 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 transition-colors"
+                                title="Buka WhatsApp Pelajar (wa.me/6)"
                               >
-                                <Phone className="w-3 h-3 text-emerald-600" />
-                                <span>{reg.phone}</span>
+                                <MessageSquare className="w-3.5 h-3.5" />
                               </a>
                             )}
-                            <div className="text-[10px] text-slate-400">{reg.email}</div>
-                          </div>
-                        </td>
-                        <td className="py-3 px-2 text-slate-800 font-semibold max-w-[180px] truncate">
-                          {reg.eventTitle || reg.eventId}
-                        </td>
-                        <td className="py-3 pl-2 text-right text-slate-500 text-[11px] whitespace-nowrap">
-                          {reg.timestamp || '-'}
-                        </td>
-                      </tr>
-                    ))}
+
+                            {/* Edit Registration Button */}
+                            <button
+                              id={`edit-reg-${reg.id}`}
+                              type="button"
+                              onClick={() => handleStartEditRegistration(reg)}
+                              className="inline-flex p-1.5 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 transition-colors cursor-pointer"
+                              title="Sunting Maklumat Pendaftaran Pelajar"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+
+                            {/* Delete Registration Button */}
+                            <button
+                              id={`del-reg-${reg.id}`}
+                              type="button"
+                              onClick={() => setDeleteConfirmReg(reg)}
+                              className="inline-flex p-1.5 rounded-lg bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 transition-colors cursor-pointer"
+                              title="Padam Rekod Pendaftaran"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
                 </tbody>
               </table>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Modal: Edit Registration Record */}
+      {editingRegistration && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 space-y-5 animate-in zoom-in-95">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
+                  <Edit2 className="w-4 h-4 text-indigo-600" />
+                  <span>Sunting Maklumat Pendaftaran</span>
+                </h3>
+                <p className="text-xs text-slate-500 font-mono mt-0.5">
+                  ID Pas: <span className="font-bold text-indigo-600">{editingRegistration.id}</span>
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingRegistration(null)}
+                className="p-1.5 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditedRegistration} className="space-y-4">
+              {/* Nama Pelajar */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Nama Penuh Pelajar <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editingRegistration.studentName}
+                  onChange={(e) => setEditingRegistration({ ...editingRegistration, studentName: maskFullNameLive(e.target.value) })}
+                  onBlur={() => setEditingRegistration({ ...editingRegistration, studentName: normalizeFullName(editingRegistration.studentName) })}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-semibold uppercase focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                />
+              </div>
+
+              {/* No. ID & Program */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    No. ID / Matrik Pelajar <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editingRegistration.studentId}
+                    onChange={(e) => setEditingRegistration({ ...editingRegistration, studentId: maskStudentId(e.target.value) })}
+                    onBlur={() => setEditingRegistration({ ...editingRegistration, studentId: normalizeStudentId(editingRegistration.studentId) })}
+                    placeholder="PDA-2502-011"
+                    maxLength={12}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-mono font-bold uppercase focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                  />
+                  <span className="text-[10px] text-slate-400 block mt-0.5">Format: XXX-XXXX-XXX</span>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Program / Kursus
+                  </label>
+                  <input
+                    type="text"
+                    value={editingRegistration.programCode}
+                    onChange={(e) => setEditingRegistration({ ...editingRegistration, programCode: e.target.value })}
+                    placeholder="Contoh: DIA, DBS, DIB"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                  />
+                </div>
+              </div>
+
+              {/* No. Telefon (WhatsApp) & Email */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    No. Telefon (WhatsApp) <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editingRegistration.phone}
+                    onChange={(e) => setEditingRegistration({ ...editingRegistration, phone: maskPhoneNumber(e.target.value) })}
+                    onBlur={() => setEditingRegistration({ ...editingRegistration, phone: normalizePhoneNumber(editingRegistration.phone) })}
+                    placeholder="014-5313756"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                  />
+                  <span className="text-[10px] text-emerald-600 font-bold block mt-1">
+                    Direct Link: wa.me/{formatMalaysiaWhatsAppNumber(editingRegistration.phone)}
+                  </span>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Emel Siswa
+                  </label>
+                  <input
+                    type="email"
+                    value={editingRegistration.email}
+                    onChange={(e) => setEditingRegistration({ ...editingRegistration, email: e.target.value })}
+                    placeholder="pelajar@gapps.kpm.edu.my"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                  />
+                </div>
+              </div>
+
+              {/* Acara Dipohon */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Acara / Program Berkaitan
+                </label>
+                <select
+                  value={editingRegistration.eventId}
+                  onChange={(e) => {
+                    const selected = events.find((evt) => evt.id === e.target.value);
+                    setEditingRegistration({
+                      ...editingRegistration,
+                      eventId: e.target.value,
+                      eventTitle: selected ? selected.title : editingRegistration.eventTitle
+                    });
+                  }}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                >
+                  {events.map((evt) => (
+                    <option key={evt.id} value={evt.id}>
+                      {evt.title}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Tarikh & Masa Daftar */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Tarikh & Masa Rekod Pendaftaran
+                </label>
+                <input
+                  type="text"
+                  value={editingRegistration.timestamp}
+                  onChange={(e) => setEditingRegistration({ ...editingRegistration, timestamp: e.target.value })}
+                  placeholder="29/08/2026, 02:30 PM"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                />
+              </div>
+
+              {/* WhatsApp Message Preview Box */}
+              <div className="bg-emerald-50/70 border border-emerald-200/80 rounded-2xl p-3 text-xs space-y-1.5">
+                <div className="flex items-center justify-between text-emerald-900 font-bold text-[11px]">
+                  <span className="flex items-center gap-1.5">
+                    <Phone className="w-3 h-3 text-emerald-600" />
+                    <span>Draf Pengesahan WhatsApp Auto (wa.me/6...)</span>
+                  </span>
+                  <a
+                    href={generateRegistrationWhatsAppUrl(editingRegistration)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-emerald-700 hover:underline flex items-center gap-1 font-extrabold"
+                  >
+                    <span>Buka WhatsApp</span>
+                    <ExternalLink className="w-2.5 h-2.5" />
+                  </a>
+                </div>
+                <p className="text-[11px] text-slate-600 leading-relaxed bg-white/80 p-2.5 rounded-xl font-mono text-[10px] whitespace-pre-line max-h-28 overflow-y-auto border border-emerald-100">
+                  {generateRegistrationWhatsAppMessage(editingRegistration)}
+                </p>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setEditingRegistration(null)}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingReg}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-xl text-xs font-bold shadow-md shadow-indigo-200 flex items-center gap-1.5 transition-all disabled:opacity-50 cursor-pointer"
+                >
+                  {isSavingReg ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                  <span>Simpan Perubahan</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Delete Registration Confirmation */}
+      {deleteConfirmReg && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100 space-y-4 animate-in zoom-in-95">
+            <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
+              <Trash2 className="w-6 h-6" />
+            </div>
+
+            <div className="text-center space-y-1.5">
+              <h3 className="text-base font-extrabold text-slate-900">
+                Padam Rekod Pendaftaran?
+              </h3>
+              <p className="text-xs text-slate-500">
+                Adakah anda pasti mahu memadam rekod pendaftaran peserta ini daripada sistem? Tindakan ini tidak boleh diundur.
+              </p>
+            </div>
+
+            <div className="bg-slate-50 rounded-2xl p-3.5 border border-slate-200/80 text-xs space-y-1 text-slate-700">
+              <div><span className="text-slate-400 font-medium">Nama:</span> <strong className="text-slate-900">{deleteConfirmReg.studentName}</strong></div>
+              <div><span className="text-slate-400 font-medium">No. Matrik:</span> <span className="font-mono font-bold">{deleteConfirmReg.studentId}</span></div>
+              <div><span className="text-slate-400 font-medium">Acara:</span> <span>{deleteConfirmReg.eventTitle || deleteConfirmReg.eventId}</span></div>
+              <div><span className="text-slate-400 font-medium">No. Telefon:</span> <span className="text-emerald-700 font-bold">{deleteConfirmReg.phone}</span></div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setDeleteConfirmReg(null)}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                disabled={isDeletingReg}
+                onClick={handleConfirmDeleteRegistration}
+                className="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-md shadow-rose-200 flex items-center gap-1.5 transition-all disabled:opacity-50 cursor-pointer"
+              >
+                {isDeletingReg ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                <span>Padam Rekod Sekarang</span>
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
