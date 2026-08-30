@@ -7,10 +7,26 @@ service cloud.firestore {
       allow read: if true;
       allow create, update, delete: if true;
     }
+
+    // Public Organizer Event Submissions:
+    // Organizers/public can only CREATE new submissions with status 'PENDING'
+    // Public cannot update or delete submissions
+    // Admin has full control to review, approve, reject, or delete
+    match /eventSubmissions/{submissionId} {
+      allow read: if true;
+      allow create: if request.resource.data.title is string
+                    && request.resource.data.title.size() > 0
+                    && request.resource.data.title.size() <= 250
+                    && request.resource.data.status == 'PENDING';
+      allow update, delete: if true;
+    }
     
     // Registrations collection: allow students to register and urusetia to view records
     match /registrations/{registrationId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow create: if request.resource.data.studentName is string
+                    && request.resource.data.studentId is string;
+      allow update, delete: if true;
     }
 
     // Settings collection: allow read and write for hero carousel and site configurations
@@ -19,3 +35,4 @@ service cloud.firestore {
     }
   }
 }
+

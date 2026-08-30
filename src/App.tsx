@@ -10,6 +10,7 @@ import { CalendarView } from './components/CalendarView';
 import { RegistrationModal } from './components/RegistrationModal';
 import { ArchiveView } from './components/ArchiveView';
 import { AdminPortal } from './components/AdminPortal';
+import { EventSubmissionView } from './components/EventSubmissionView';
 import { AdminPinModal } from './components/AdminPinModal';
 import { DeleteConfirmationModal } from './components/DeleteConfirmationModal';
 import { Footer } from './components/Footer';
@@ -125,11 +126,13 @@ export default function App() {
     };
   }, []);
 
-  // Deep-linking hash support: Automatically open Event Detail Modal if URL contains #event-slug or #event-ID
+  // Deep-linking hash support: Automatically handle modal (#event-slug) and tab deep-links (#hantar-event, #kalendar, etc.)
   useEffect(() => {
     const handleHashCheck = () => {
-      const hash = window.location.hash;
-      if (hash && hash.startsWith('#event-')) {
+      const hash = window.location.hash.toLowerCase().trim();
+      if (!hash) return;
+
+      if (hash.startsWith('#event-')) {
         const eventId = hash.replace('#event-', '').trim();
         if (eventId) {
           const found = findEventBySlugOrId(events, eventId);
@@ -137,14 +140,57 @@ export default function App() {
             setSelectedEventForDetail(found);
           }
         }
+      } else if (
+        hash === '#hantar-event' || 
+        hash === '#submit-event' || 
+        hash === '#hantar' || 
+        hash === '#cadang-event' || 
+        hash === '#borang-penganjur'
+      ) {
+        setCurrentTab('submit-event');
+      } else if (hash === '#events' || hash === '#semua-event' || hash === '#semua-acara') {
+        setCurrentTab('events');
+      } else if (hash === '#kalendar' || hash === '#calendar') {
+        setCurrentTab('calendar');
+      } else if (hash === '#jangan-terlepas' || hash === '#dont-miss') {
+        setCurrentTab('dont-miss');
+      } else if (hash === '#arkib' || hash === '#archive') {
+        setCurrentTab('archive');
+      } else if (hash === '#admin') {
+        if (isAdminUnlocked) {
+          setCurrentTab('admin');
+        } else {
+          setIsAdminPinOpen(true);
+        }
       }
     };
 
-    // Check on events change and hashchange event
+    // Check on initial load / events change and hashchange event
     handleHashCheck();
     window.addEventListener('hashchange', handleHashCheck);
     return () => window.removeEventListener('hashchange', handleHashCheck);
-  }, [events]);
+  }, [events, isAdminUnlocked]);
+
+  const handleSelectTab = (tab: ViewTab) => {
+    setCurrentTab(tab);
+    try {
+      if (tab === 'submit-event') {
+        window.history.replaceState(null, '', '#hantar-event');
+      } else if (tab === 'events') {
+        window.history.replaceState(null, '', '#events');
+      } else if (tab === 'calendar') {
+        window.history.replaceState(null, '', '#kalendar');
+      } else if (tab === 'dont-miss') {
+        window.history.replaceState(null, '', '#jangan-terlepas');
+      } else if (tab === 'archive') {
+        window.history.replaceState(null, '', '#arkib');
+      } else if (tab === 'admin') {
+        window.history.replaceState(null, '', '#admin');
+      } else if (tab === 'discover') {
+        window.history.replaceState(null, '', window.location.pathname + window.location.search);
+      }
+    } catch {}
+  };
 
   // Keep URL hash in sync with short slug when modal is opened / closed
   const handleOpenDetailModal = (evt: KpmbpEvent) => {
@@ -159,7 +205,21 @@ export default function App() {
     setSelectedEventForDetail(null);
     try {
       if (window.location.hash.startsWith('#event-')) {
-        window.history.replaceState(null, '', window.location.pathname + window.location.search);
+        if (currentTab === 'submit-event') {
+          window.history.replaceState(null, '', '#hantar-event');
+        } else if (currentTab === 'events') {
+          window.history.replaceState(null, '', '#events');
+        } else if (currentTab === 'calendar') {
+          window.history.replaceState(null, '', '#kalendar');
+        } else if (currentTab === 'dont-miss') {
+          window.history.replaceState(null, '', '#jangan-terlepas');
+        } else if (currentTab === 'archive') {
+          window.history.replaceState(null, '', '#arkib');
+        } else if (currentTab === 'admin') {
+          window.history.replaceState(null, '', '#admin');
+        } else {
+          window.history.replaceState(null, '', window.location.pathname + window.location.search);
+        }
       }
     } catch {}
   };
@@ -253,6 +313,15 @@ export default function App() {
     const dynamicStatus = getDynamicEventStatus(e);
     return dynamicStatus === 'Registration Open' || dynamicStatus === 'Registration Closing Soon';
   }).length;
+
+  // List of Urgent / Jangan Terlepas events (active, not archived, dynamic status closing soon or open registration)
+  const dontMissEvents = sortEventsByNearestDue(
+    activeOneTimeEvents.filter((e) => {
+      if (e.registrationMode === 'none') return false;
+      const dynamicStatus = getDynamicEventStatus(e);
+      return dynamicStatus === 'Registration Closing Soon' || dynamicStatus === 'Registration Open';
+    })
+  );
 
   // Base list depending on tab & filter mode:
   // - Archive: archived events
@@ -451,7 +520,7 @@ export default function App() {
       {/* Navigation Header */}
       <Navbar
         currentTab={currentTab}
-        onSelectTab={setCurrentTab}
+        onSelectTab={handleSelectTab}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         urgentCount={urgentCount}
@@ -471,7 +540,7 @@ export default function App() {
             <HeroSection
               heroConfig={heroConfig}
               events={events}
-              onSelectTab={setCurrentTab}
+              onSelectTab={handleSelectTab}
               onViewDetails={handleOpenDetailModal}
               openCount={openRegistrationCount}
               urgentCount={urgentCount}
@@ -641,7 +710,7 @@ export default function App() {
               <DontMissSidebar
                 events={events}
                 onViewDetails={handleOpenDetailModal}
-                onSelectTab={setCurrentTab}
+                onSelectTab={handleSelectTab}
               />
 
             </div>
@@ -757,23 +826,41 @@ export default function App() {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              {sortEventsByNearestDue(
-                events.filter((e) => e.status === 'Registration Closing Soon' || e.status === 'Registration Open')
-              ).map((event) => (
-                <EventCard
-                  key={event.id}
-                  event={event}
-                  onViewDetails={handleOpenDetailModal}
-                  onRegister={setSelectedEventForRegistration}
-                  isSaved={savedEventIds.includes(event.id)}
-                  onToggleSave={handleToggleSave}
-                  isAdmin={isAdminUnlocked}
-                  onEdit={handleTriggerEdit}
-                  onDelete={handleRequestDelete}
-                />
-              ))}
-            </div>
+            {dontMissEvents.length === 0 ? (
+              <div className="text-center py-16 bg-white/80 backdrop-blur-md rounded-3xl border border-slate-200/80 p-8 shadow-xs space-y-3">
+                <div className="w-12 h-12 rounded-2xl bg-rose-50 border border-rose-100 flex items-center justify-center mx-auto text-rose-500">
+                  <Flame className="w-6 h-6" />
+                </div>
+                <h3 className="text-base font-bold text-slate-800">Tiada Program Mendesak Buat Masa Ini</h3>
+                <p className="text-xs text-slate-500 max-w-md mx-auto">
+                  Semua program aktif mempunyai tempoh pendaftaran yang mencukupi atau belum dibuka. Sila rujuk tab <strong>Semua Event</strong> atau <strong>Kalendar</strong> untuk senarai penuh program akan datang.
+                </p>
+                <div className="pt-2">
+                  <button
+                    onClick={() => setCurrentTab('events')}
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-xs cursor-pointer"
+                  >
+                    Lihat Semua Event
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                {dontMissEvents.map((event) => (
+                  <EventCard
+                    key={event.id}
+                    event={event}
+                    onViewDetails={handleOpenDetailModal}
+                    onRegister={setSelectedEventForRegistration}
+                    isSaved={savedEventIds.includes(event.id)}
+                    onToggleSave={handleToggleSave}
+                    isAdmin={isAdminUnlocked}
+                    onEdit={handleTriggerEdit}
+                    onDelete={handleRequestDelete}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -790,6 +877,16 @@ export default function App() {
             onDelete={handleRequestDelete}
             onSeedSampleData={handleSeedSampleData}
           />
+        )}
+
+        {/* SUBMIT EVENT TAB (Public Organizer Submission) */}
+        {currentTab === 'submit-event' && (
+          <div className="animate-in fade-in duration-300">
+            <EventSubmissionView
+              onBackToDiscover={() => handleSelectTab('discover')}
+              onShowToast={showToast}
+            />
+          </div>
         )}
 
         {/* ADMIN TAB */}

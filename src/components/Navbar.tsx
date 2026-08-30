@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ViewTab } from '../types';
-import { Search, Calendar as CalendarIcon, Sparkles, Compass, Flame, ShieldCheck, Menu, X, Lock, KeyRound, Archive } from 'lucide-react';
+import { Search, Calendar as CalendarIcon, Sparkles, Compass, Flame, ShieldCheck, Menu, X, Lock, KeyRound, Archive, CalendarPlus } from 'lucide-react';
 
 interface NavbarProps {
   currentTab: ViewTab;
@@ -36,6 +36,11 @@ export const Navbar: React.FC<NavbarProps> = ({
       badge: urgentCount 
     },
     { id: 'archive', label: 'Arkib', icon: <Archive className="w-4 h-4" /> },
+    { 
+      id: 'submit-event', 
+      label: 'Hantar Event', 
+      icon: <CalendarPlus className="w-4 h-4 text-emerald-600" /> 
+    },
   ];
 
   const handleAdminModeClick = () => {

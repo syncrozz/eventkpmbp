@@ -1,4 +1,4 @@
-import { KpmbpEvent, RegistrationRecord, HeroConfig, DEFAULT_HERO_CONFIG } from '../types';
+import { KpmbpEvent, RegistrationRecord, HeroConfig, DEFAULT_HERO_CONFIG, EventSubmission } from '../types';
 import {
   subscribeToEvents as subscribeToFirestoreEvents,
   createEventInFirestore,
@@ -15,6 +15,14 @@ import {
   saveLocalHeroConfigCache,
   subscribeToHeroConfig as subscribeToFirestoreHeroConfig,
   saveHeroConfigToFirestore,
+  submitEventToFirestore,
+  subscribeToSubmissions as subscribeToFirestoreSubmissions,
+  updateSubmissionInFirestore,
+  deleteSubmissionFromFirestore,
+  rejectSubmissionInFirestore,
+  approveSubmissionInFirestore,
+  getLocalSubmissionsCache,
+  saveLocalSubmissionsCache,
   db
 } from './firebase';
 import { INITIAL_EVENTS } from '../data/initialEvents';
@@ -173,4 +181,60 @@ export async function saveHeroConfig(config: HeroConfig): Promise<void> {
   saveLocalHeroConfigCache(config);
   await saveHeroConfigToFirestore(config);
 }
+
+/**
+ * Public Organizer: Submit a new event proposal
+ */
+export async function submitOrganizerEvent(submissionData: Omit<EventSubmission, 'id'>): Promise<string> {
+  return await submitEventToFirestore(submissionData);
+}
+
+/**
+ * Real-time event submissions subscription for Admin review
+ */
+export function subscribeToAllSubmissions(
+  onUpdate: (submissions: EventSubmission[]) => void,
+  onError?: (err: any) => void
+): () => void {
+  return subscribeToFirestoreSubmissions(onUpdate, onError);
+}
+
+/**
+ * Admin: Update an existing submission record
+ */
+export async function updateExistingSubmission(submission: EventSubmission): Promise<void> {
+  await updateSubmissionInFirestore(submission);
+}
+
+/**
+ * Admin: Delete a submission record
+ */
+export async function deleteExistingSubmission(id: string): Promise<void> {
+  await deleteSubmissionFromFirestore(id);
+}
+
+/**
+ * Admin: Reject a submission with optional reason
+ */
+export async function rejectEventSubmission(submissionId: string, reason?: string): Promise<void> {
+  await rejectSubmissionInFirestore(submissionId, reason);
+}
+
+/**
+ * Admin: Approve a submission and publish it to the official events collection
+ */
+export async function approveEventSubmission(
+  submission: EventSubmission,
+  finalEventPayload: Omit<KpmbpEvent, 'id'>
+): Promise<string> {
+  return await approveSubmissionInFirestore(submission, finalEventPayload);
+}
+
+/**
+ * Get local cached submissions
+ */
+export function getLocalSubmissions(): EventSubmission[] {
+  return getLocalSubmissionsCache();
+}
+
 

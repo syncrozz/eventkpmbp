@@ -14,7 +14,7 @@ import {
   serverTimestamp,
   getDocFromServer
 } from 'firebase/firestore';
-import { KpmbpEvent, RegistrationRecord, HeroConfig, DEFAULT_HERO_CONFIG } from '../types';
+import { KpmbpEvent, RegistrationRecord, HeroConfig, DEFAULT_HERO_CONFIG, EventSubmission } from '../types';
 import { INITIAL_EVENTS } from '../data/initialEvents';
 import { sortEventsByNearestDue } from '../utils/calendar';
 import firebaseConfig from '../../firebase-applet-config.json';
@@ -44,6 +44,7 @@ export const db = primaryDb;
 const EVENTS_COLLECTION = 'events';
 const REGISTRATIONS_COLLECTION = 'registrations';
 const SETTINGS_COLLECTION = 'settings';
+const SUBMISSIONS_COLLECTION = 'eventSubmissions';
 const HERO_CONFIG_DOC_ID = 'hero_carousel';
 
 /**
@@ -137,6 +138,29 @@ export function saveLocalRegistrationsCache(registrations: RegistrationRecord[])
   if (typeof window === 'undefined') return;
   try {
     localStorage.setItem('kpmbp_registrations_v1', JSON.stringify(registrations));
+  } catch {}
+}
+
+// Helper to load stored submissions cache
+export function getLocalSubmissionsCache(): EventSubmission[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem('kpmbp_submissions_v1');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        return parsed;
+      }
+    }
+  } catch {}
+  return [];
+}
+
+// Helper to save stored submissions cache
+export function saveLocalSubmissionsCache(submissions: EventSubmission[]): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem('kpmbp_submissions_v1', JSON.stringify(submissions));
   } catch {}
 }
 
@@ -514,4 +538,240 @@ export async function saveHeroConfigToFirestore(config: HeroConfig): Promise<voi
     console.warn('Hero config stored in local cache (Cloud notice):', err?.message);
   }
 }
+
+/**
+ * Creates and submits a new organizer event proposal to Firestore and local cache
+ */
+export async function submitEventToFirestore(
+  submissionData: Omit<EventSubmission, 'id'>
+): Promise<string> {
+  try {
+    const subRef = collection(db, SUBMISSIONS_COLLECTION);
+    const newDoc = doc(subRef);
+    const submissionId = newDoc.id;
+
+    const fullRecord: EventSubmission = {
+      ...submissionData,
+      id: submissionId,
+      status: 'PENDING',
+      submittedAt: submissionData.submittedAt || new Date().toISOString()
+    };
+
+    // 1. Update local cache immediately
+    const local = getLocalSubmissionsCache();
+    saveLocalSubmissionsCache([fullRecord, ...local.filter((s) => s.id !== submissionId)]);
+
+    // 2. Write to Firestore
+    const payload = sanitizeForFirestore({
+      ...fullRecord,
+      createdAt: serverTimestamp()
+    });
+    await setDoc(newDoc, payload);
+
+    return submissionId;
+  } catch (error: any) {
+    console.warn('Submission saved locally with cloud warning:', error?.message);
+    // If Firestore failed, ensure local has the entry
+    return `local_${Date.now()}`;
+  }
+}
+
+/**
+ * Subscribes to real-time event submissions for Admin review
+ */
+export function subscribeToSubmissions(
+  onUpdate: (submissions: EventSubmission[]) => void,
+  onError?: (err: Error) => void
+) {
+  // 1. Emit local cache immediately
+  const cached = getLocalSubmissionsCache();
+  if (cached.length > 0) {
+    onUpdate(cached);
+  }
+
+  const subRef = collection(db, SUBMISSIONS_COLLECTION);
+  let unsubscribe: (() => void) | null = null;
+
+  try {
+    unsubscribe = onSnapshot(
+      subRef,
+      (snapshot) => {
+        const list: EventSubmission[] = [];
+        snapshot.forEach((docSnap) => {
+          const data = docSnap.data();
+          list.push({
+            id: docSnap.id,
+            status: data.status || 'PENDING',
+            submittedAt: data.submittedAt || new Date().toISOString(),
+            reviewedAt: data.reviewedAt || undefined,
+            reviewedBy: data.reviewedBy || undefined,
+            rejectionReason: data.rejectionReason || undefined,
+            approvedEventId: data.approvedEventId || undefined,
+            submitterName: data.submitterName || '',
+            submitterPhone: data.submitterPhone || '',
+            submitterEmail: data.submitterEmail || undefined,
+            submitterRole: data.submitterRole || undefined,
+            eventType: data.eventType || 'ONE_TIME_EVENT',
+            title: data.title || '',
+            description: data.description || '',
+            category: data.category || 'Pertandingan',
+            date: data.date || '',
+            startTime: data.startTime || '',
+            endTime: data.endTime || '',
+            location: data.location || '',
+            organiser: data.organiser || '',
+            image: data.image || undefined,
+            eventMode: data.eventMode || 'physical',
+            registrationMode: data.registrationMode || 'none',
+            organiserWhatsApp: data.organiserWhatsApp || undefined,
+            organiserUrl: data.organiserUrl || undefined,
+            submissionDeadline: data.submissionDeadline || undefined,
+            registrationUrl: data.registrationUrl || undefined,
+            registrationDeadline: data.registrationDeadline || undefined,
+            eligibility: data.eligibility || undefined,
+            contact: data.contact || undefined,
+            importantNotice: data.importantNotice || undefined,
+            seatsLeft: typeof data.seatsLeft === 'number' ? data.seatsLeft : undefined,
+            totalSeats: typeof data.totalSeats === 'number' ? data.totalSeats : undefined,
+            tags: Array.isArray(data.tags) ? data.tags : [],
+            scheduleSummary: data.scheduleSummary || undefined,
+            scheduleSessions: Array.isArray(data.scheduleSessions) ? data.scheduleSessions : undefined,
+            programDuration: data.programDuration || undefined,
+            feeType: data.feeType || undefined,
+            feeAmount: data.feeAmount || undefined,
+            targetAudience: data.targetAudience || undefined
+          });
+        });
+
+        // Sort: PENDING first, then by submittedAt desc
+        list.sort((a, b) => {
+          if (a.status === 'PENDING' && b.status !== 'PENDING') return -1;
+          if (a.status !== 'PENDING' && b.status === 'PENDING') return 1;
+          return new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime();
+        });
+
+        saveLocalSubmissionsCache(list);
+        onUpdate(list);
+      },
+      (err) => {
+        console.warn('Submissions sync notice (using local cache):', err.message);
+        onUpdate(getLocalSubmissionsCache());
+        if (onError) onError(err);
+      }
+    );
+  } catch (err: any) {
+    console.warn('Submissions subscription unavailable:', err?.message);
+    onUpdate(getLocalSubmissionsCache());
+    if (onError) onError(err);
+  }
+
+  return () => {
+    if (unsubscribe) {
+      try {
+        unsubscribe();
+      } catch {}
+    }
+  };
+}
+
+/**
+ * Updates a submission in Firestore and local cache
+ */
+export async function updateSubmissionInFirestore(submission: EventSubmission): Promise<void> {
+  const localList = getLocalSubmissionsCache();
+  const nextList = localList.map((s) => (s.id === submission.id ? submission : s));
+  saveLocalSubmissionsCache(nextList);
+
+  try {
+    const docRef = doc(db, SUBMISSIONS_COLLECTION, submission.id);
+    const payload = sanitizeForFirestore({
+      ...submission,
+      updatedAt: new Date().toISOString()
+    });
+    await setDoc(docRef, payload, { merge: true });
+  } catch (err: any) {
+    console.warn('Submission updated locally (Cloud notice):', err?.message);
+  }
+}
+
+/**
+ * Deletes a submission from Firestore and local cache
+ */
+export async function deleteSubmissionFromFirestore(id: string): Promise<void> {
+  const localList = getLocalSubmissionsCache();
+  saveLocalSubmissionsCache(localList.filter((s) => s.id !== id));
+
+  try {
+    const docRef = doc(db, SUBMISSIONS_COLLECTION, id);
+    await deleteDoc(docRef);
+  } catch (err: any) {
+    console.warn('Submission deleted from local cache:', err?.message);
+  }
+}
+
+/**
+ * Rejects an event submission with optional reason
+ */
+export async function rejectSubmissionInFirestore(submissionId: string, reason?: string): Promise<void> {
+  const localList = getLocalSubmissionsCache();
+  const target = localList.find((s) => s.id === submissionId);
+  const now = new Date().toISOString();
+
+  if (target) {
+    const updated: EventSubmission = {
+      ...target,
+      status: 'REJECTED',
+      rejectionReason: reason || 'Ditolak oleh pentadbir',
+      reviewedAt: now,
+      reviewedBy: 'Admin KPMBP'
+    };
+    await updateSubmissionInFirestore(updated);
+  } else {
+    try {
+      const docRef = doc(db, SUBMISSIONS_COLLECTION, submissionId);
+      await setDoc(
+        docRef,
+        {
+          status: 'REJECTED',
+          rejectionReason: reason || 'Ditolak oleh pentadbir',
+          reviewedAt: now,
+          reviewedBy: 'Admin KPMBP',
+          updatedAt: now
+        },
+        { merge: true }
+      );
+    } catch (err) {}
+  }
+}
+
+/**
+ * Idempotently approves a submission and publishes it to the official events collection
+ */
+export async function approveSubmissionInFirestore(
+  submission: EventSubmission,
+  finalEventPayload: Omit<KpmbpEvent, 'id'>
+): Promise<string> {
+  // 1. Check idempotency: If already approved and has approvedEventId, return that
+  if (submission.status === 'APPROVED' && submission.approvedEventId) {
+    return submission.approvedEventId;
+  }
+
+  // 2. Create the official event in events collection
+  const newEventId = await createEventInFirestore(finalEventPayload);
+
+  // 3. Mark submission as APPROVED and link approvedEventId
+  const now = new Date().toISOString();
+  const updatedSubmission: EventSubmission = {
+    ...submission,
+    ...finalEventPayload,
+    status: 'APPROVED',
+    approvedEventId: newEventId,
+    reviewedAt: now,
+    reviewedBy: 'Admin KPMBP'
+  };
+
+  await updateSubmissionInFirestore(updatedSubmission);
+  return newEventId;
+}
+
 

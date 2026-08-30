@@ -81,12 +81,63 @@
         "slides": { "type": "array", "description": "Hero carousel slides array" },
         "updatedAt": { "type": "string", "description": "Last update timestamp" }
       }
+    },
+    "eventSubmissions": {
+      "title": "EventSubmissions",
+      "description": "Public organizer event submissions pending admin review",
+      "type": "object",
+      "properties": {
+        "status": { "type": "string", "description": "PENDING, APPROVED, REJECTED" },
+        "submittedAt": { "type": "string", "description": "Submission ISO timestamp" },
+        "reviewedAt": { "type": "string", "description": "Review ISO timestamp" },
+        "reviewedBy": { "type": "string", "description": "Reviewer identity" },
+        "rejectionReason": { "type": "string", "description": "Reason for rejection if rejected" },
+        "approvedEventId": { "type": "string", "description": "ID of published event" },
+        "submitterName": { "type": "string", "description": "Name of organizer representative" },
+        "submitterPhone": { "type": "string", "description": "Phone number of organizer" },
+        "submitterEmail": { "type": "string", "description": "Email of organizer" },
+        "submitterRole": { "type": "string", "description": "Role of submitter" },
+        "eventType": { "type": "string", "description": "ONE_TIME_EVENT or ONGOING_PROGRAM" },
+        "title": { "type": "string", "description": "Title of the proposed event" },
+        "description": { "type": "string", "description": "Full description of event" },
+        "category": { "type": "string", "description": "Category of event" },
+        "date": { "type": "string", "description": "Event date" },
+        "startTime": { "type": "string", "description": "Start time" },
+        "endTime": { "type": "string", "description": "End time" },
+        "location": { "type": "string", "description": "Campus location" },
+        "organiser": { "type": "string", "description": "Organising body or club" },
+        "image": { "type": "string", "description": "Poster / banner image" },
+        "eventMode": { "type": "string", "description": "physical or online" },
+        "registrationMode": { "type": "string", "description": "none, admin, or google_form" },
+        "organiserWhatsApp": { "type": "string", "description": "WhatsApp contact" },
+        "organiserUrl": { "type": "string", "description": "Official reference URL" },
+        "submissionDeadline": { "type": "string", "description": "Submission deadline" },
+        "registrationUrl": { "type": "string", "description": "Registration URL" },
+        "registrationDeadline": { "type": "string", "description": "Registration deadline" },
+        "eligibility": { "type": "string", "description": "Eligibility conditions" },
+        "contact": { "type": "string", "description": "Contact info" },
+        "importantNotice": { "type": "string", "description": "Notice text" },
+        "seatsLeft": { "type": "number", "description": "Seats left" },
+        "totalSeats": { "type": "number", "description": "Total seats" },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "scheduleSummary": { "type": "string" },
+        "scheduleSessions": { "type": "array" },
+        "programDuration": { "type": "string" },
+        "feeType": { "type": "string" },
+        "feeAmount": { "type": "string" },
+        "targetAudience": { "type": "string" }
+      },
+      "required": ["title", "description", "category", "organiser", "submitterName", "submitterPhone", "status"]
     }
   },
   "firestore": {
     "/events/{eventId}": {
       "schema": "events",
       "description": "Public events collection"
+    },
+    "/eventSubmissions/{submissionId}": {
+      "schema": "eventSubmissions",
+      "description": "Organizer event submission proposals"
     },
     "/registrations/{registrationId}": {
       "schema": "registrations",

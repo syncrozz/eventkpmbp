@@ -87,7 +87,54 @@ export interface RegistrationRecord {
   timestamp: string;
 }
 
-export type ViewTab = 'discover' | 'events' | 'calendar' | 'dont-miss' | 'archive' | 'admin';
+export type SubmissionStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+
+export interface EventSubmission {
+  id: string;
+  status: SubmissionStatus;
+  submittedAt: string; // ISO datetime
+  reviewedAt?: string;
+  reviewedBy?: string;
+  rejectionReason?: string;
+  approvedEventId?: string; // Links to published official event
+  // Submitter / Organizer Rep details
+  submitterName: string;
+  submitterPhone: string;
+  submitterEmail?: string;
+  submitterRole?: string; // e.g. "Presiden Kelab", "Penyelaras Program", "Wakil Pelajar"
+  // Event details
+  eventType?: EventType;
+  title: string;
+  description: string;
+  category: Exclude<EventCategory, 'Semua'>;
+  date?: string;
+  startTime?: string;
+  endTime?: string;
+  location: string;
+  organiser: string;
+  image?: string;
+  eventMode?: EventMode;
+  registrationMode?: RegistrationMode;
+  organiserWhatsApp?: string;
+  organiserUrl?: string;
+  submissionDeadline?: string;
+  registrationUrl?: string;
+  registrationDeadline?: string;
+  eligibility?: string;
+  contact?: string;
+  importantNotice?: string;
+  seatsLeft?: number;
+  totalSeats?: number;
+  tags?: string[];
+  scheduleSummary?: string;
+  scheduleSessions?: ProgramSession[];
+  programDuration?: string;
+  feeType?: 'free' | 'paid' | 'voluntary';
+  feeAmount?: string;
+  targetAudience?: string;
+}
+
+export type ViewTab = 'discover' | 'events' | 'calendar' | 'dont-miss' | 'archive' | 'submit-event' | 'admin';
 
 export type HeroCtaAction =
   | 'tab_calendar'

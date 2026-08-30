@@ -10,12 +10,19 @@ import {
   HeroConfig,
   HeroSlide,
   DEFAULT_HERO_CONFIG,
-  HeroCtaAction
+  HeroCtaAction,
+  EventSubmission,
+  SubmissionStatus
 } from '../types';
 import { 
   subscribeToAllRegistrations, 
   deleteExistingRegistration, 
   updateExistingRegistration,
+  subscribeToAllSubmissions,
+  deleteExistingSubmission,
+  updateExistingSubmission,
+  rejectEventSubmission,
+  approveEventSubmission,
   getActiveBackendLabel, 
   getActiveBackendType 
 } from '../services/dbAdapter';
@@ -53,6 +60,7 @@ import {
   SlidersHorizontal, ArrowLeftRight, Star, Flame, Shield, BookOpen, Compass, Save, RotateCcw, MonitorPlay, MessageSquare, Send
 } from 'lucide-react';
 import { AdminHeroManager } from './AdminHeroManager';
+import { AdminSubmissionsTab } from './AdminSubmissionsTab';
 
 interface AdminPortalProps {
   events: KpmbpEvent[];
@@ -81,10 +89,23 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   onSaveHeroConfig,
   onShowToast
 }) => {
-  const [activeAdminTab, setActiveAdminTab] = useState<'events' | 'registrations' | 'hero'>('events');
+  const [activeAdminTab, setActiveAdminTab] = useState<'events' | 'registrations' | 'hero' | 'submissions'>('events');
   const [registrations, setRegistrations] = useState<RegistrationRecord[]>([]);
   const [regSearchQuery, setRegSearchQuery] = useState('');
   const [selectedRegEventId, setSelectedRegEventId] = useState<string>('all');
+
+  // Submissions State
+  const [submissions, setSubmissions] = useState<EventSubmission[]>([]);
+  const [subFilterStatus, setSubFilterStatus] = useState<'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED'>('ALL');
+  const [subSearchQuery, setSubSearchQuery] = useState('');
+  const [reviewingSubmission, setReviewingSubmission] = useState<EventSubmission | null>(null);
+  const [rejectingSubmission, setRejectingSubmission] = useState<EventSubmission | null>(null);
+  const [rejectionReason, setRejectionReason] = useState('');
+  const [isApprovingSub, setIsApprovingSub] = useState(false);
+  const [isRejectingSub, setIsRejectingSub] = useState(false);
+  const [deleteConfirmSub, setDeleteConfirmSub] = useState<EventSubmission | null>(null);
+  const [isDeletingSub, setIsDeletingSub] = useState(false);
+  const [previewSubPoster, setPreviewSubPoster] = useState<string | null>(null);
 
   // Registration Edit & Delete States
   const [editingRegistration, setEditingRegistration] = useState<RegistrationRecord | null>(null);
@@ -313,6 +334,76 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     });
     return () => unsub();
   }, []);
+
+  // Subscribe to live organizer event submissions
+  useEffect(() => {
+    const unsub = subscribeToAllSubmissions((list) => {
+      setSubmissions(list);
+    });
+    return () => unsub();
+  }, []);
+
+  // --- Submissions Review & Management Handlers ---
+  const handleOpenReviewSubmission = (sub: EventSubmission) => {
+    setReviewingSubmission(sub);
+  };
+
+  const handleConfirmApproveSubmission = async (sub: EventSubmission, finalPayload: Omit<KpmbpEvent, 'id'>) => {
+    setIsApprovingSub(true);
+    try {
+      await approveEventSubmission(sub, finalPayload);
+      setReviewingSubmission(null);
+      if (onShowToast) {
+        onShowToast(`Cadangan acara "${finalPayload.title}" berjaya diluluskan dan diterbitkan!`);
+      }
+    } catch (err: any) {
+      console.error('Error approving submission:', err);
+      alert('Ralat semasa meluluskan acara: ' + (err?.message || 'Sila cuba lagi.'));
+    } finally {
+      setIsApprovingSub(false);
+    }
+  };
+
+  const handleOpenRejectSubmission = (sub: EventSubmission) => {
+    setRejectingSubmission(sub);
+    setRejectionReason('');
+  };
+
+  const handleConfirmRejectSubmission = async () => {
+    if (!rejectingSubmission) return;
+    setIsRejectingSub(true);
+    try {
+      await rejectEventSubmission(rejectingSubmission.id, rejectionReason.trim() || undefined);
+      setRejectingSubmission(null);
+      setRejectionReason('');
+      if (onShowToast) {
+        onShowToast(`Cadangan acara telah ditolak.`);
+      }
+    } catch (err: any) {
+      console.error('Error rejecting submission:', err);
+      alert('Ralat semasa menolak cadangan: ' + (err?.message || 'Sila cuba lagi.'));
+    } finally {
+      setIsRejectingSub(false);
+    }
+  };
+
+  const handleConfirmDeleteSubmission = async () => {
+    if (!deleteConfirmSub) return;
+    setIsDeletingSub(true);
+    try {
+      await deleteExistingSubmission(deleteConfirmSub.id);
+      setDeleteConfirmSub(null);
+      if (onShowToast) {
+        onShowToast(`Rekod cadangan telah dipadam.`);
+      }
+    } catch (err: any) {
+      console.error('Error deleting submission:', err);
+      alert('Ralat semasa memadam rekod: ' + (err?.message || 'Sila cuba lagi.'));
+    } finally {
+      setIsDeletingSub(false);
+    }
+  };
+
 
   // Form State
   const [eventType, setEventType] = useState<EventType>('ONE_TIME_EVENT');
@@ -634,6 +725,32 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
               activeAdminTab === 'hero' ? 'bg-amber-400 text-slate-950' : 'bg-amber-100 text-amber-900'
             }`}>
               {(heroConfig?.slides?.filter((s) => s.enabled).length ?? 2)} Aktif
+            </span>
+          </button>
+
+          {/* Tab 4: Cadangan Penganjur (Submissions) */}
+          <button
+            id="admin-tab-submissions"
+            type="button"
+            onClick={() => setActiveAdminTab('submissions')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer relative ${
+              activeAdminTab === 'submissions'
+                ? 'bg-slate-900 text-white shadow-sm'
+                : 'text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            <FileText className="w-3.5 h-3.5 text-indigo-400" />
+            <span>Cadangan Penganjur</span>
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+              activeAdminTab === 'submissions'
+                ? 'bg-indigo-500 text-white'
+                : submissions.filter(s => s.status === 'PENDING').length > 0
+                ? 'bg-amber-500 text-white animate-pulse'
+                : 'bg-slate-200 text-slate-700'
+            }`}>
+              {submissions.filter(s => s.status === 'PENDING').length > 0 
+                ? `${submissions.filter(s => s.status === 'PENDING').length} Menunggu`
+                : submissions.length}
             </span>
           </button>
         </div>
@@ -2204,6 +2321,28 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
           heroConfig={heroConfig}
           events={events}
           onSaveHeroConfig={onSaveHeroConfig}
+          onShowToast={onShowToast}
+        />
+      )}
+
+      {/* Tab 4: Organizer Submissions Management (Semakan & Kelulusan) */}
+      {activeAdminTab === 'submissions' && (
+        <AdminSubmissionsTab
+          submissions={submissions}
+          events={events}
+          onApprove={handleConfirmApproveSubmission}
+          onReject={(id, reason) => {
+            const sub = submissions.find(s => s.id === id);
+            if (sub) {
+              setRejectingSubmission(sub);
+              setRejectionReason(reason || '');
+              return handleConfirmRejectSubmission();
+            }
+            return rejectEventSubmission(id, reason);
+          }}
+          onDelete={(id) => {
+            return deleteExistingSubmission(id);
+          }}
           onShowToast={onShowToast}
         />
       )}

@@ -68,10 +68,10 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   });
 
   return (
-    <div className="bg-white/60 backdrop-blur-xl border border-white/80 rounded-3xl p-6 shadow-sm space-y-6">
+    <div className="bg-slate-50/70 backdrop-blur-md border border-slate-200/90 rounded-3xl p-5 sm:p-6 shadow-xs space-y-6">
       
       {/* Calendar Header Controls */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200/70 pb-4">
         <div>
           <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
             <CalendarIcon className="w-6 h-6 text-indigo-600" />
@@ -88,7 +88,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
             <div className="flex items-center bg-white border border-slate-200 rounded-xl px-2 py-1 shadow-2xs">
               <button
                 onClick={handlePrevMonth}
-                className="p-1 text-slate-600 hover:text-indigo-600 hover:bg-slate-100 rounded-lg transition-colors"
+                className="p-1 text-slate-600 hover:text-indigo-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
                 title="Bulan Sebelumnya"
               >
                 <ChevronLeft className="w-5 h-5" />
@@ -98,7 +98,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
               </span>
               <button
                 onClick={handleNextMonth}
-                className="p-1 text-slate-600 hover:text-indigo-600 hover:bg-slate-100 rounded-lg transition-colors"
+                className="p-1 text-slate-600 hover:text-indigo-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
                 title="Bulan Seterusnya"
               >
                 <ChevronRight className="w-5 h-5" />
@@ -111,7 +111,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                   setCurrentMonth(today.getMonth());
                   setCurrentYear(today.getFullYear());
                 }}
-                className="px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold rounded-xl transition-colors border border-indigo-200/60 shadow-2xs"
+                className="px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold rounded-xl transition-colors border border-indigo-200/60 shadow-2xs cursor-pointer"
                 title="Kembali ke Bulan Semasa"
               >
                 Hari Ini
@@ -120,11 +120,11 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           </div>
 
           {/* Grid vs Agenda Toggle */}
-          <div className="flex bg-slate-100 p-1 rounded-xl">
+          <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200/60">
             <button
               onClick={() => setViewMode('grid')}
-              className={`p-1.5 rounded-lg text-xs font-bold transition-all ${
-                viewMode === 'grid' ? 'bg-white text-indigo-600 shadow-2xs' : 'text-slate-500'
+              className={`p-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                viewMode === 'grid' ? 'bg-white text-indigo-600 shadow-2xs' : 'text-slate-500 hover:text-slate-700'
               }`}
               title="Grid Kalendar"
             >
@@ -132,8 +132,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
             </button>
             <button
               onClick={() => setViewMode('agenda')}
-              className={`p-1.5 rounded-lg text-xs font-bold transition-all ${
-                viewMode === 'agenda' ? 'bg-white text-indigo-600 shadow-2xs' : 'text-slate-500'
+              className={`p-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                viewMode === 'agenda' ? 'bg-white text-indigo-600 shadow-2xs' : 'text-slate-500 hover:text-slate-700'
               }`}
               title="Senarai Agenda"
             >
@@ -149,7 +149,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           <button
             key={cat}
             onClick={() => setSelectedCategory(cat)}
-            className={`px-3 py-1.5 rounded-xl text-xs whitespace-nowrap transition-all ${getCategoryButtonClass(
+            className={`px-3 py-1.5 rounded-xl text-xs whitespace-nowrap transition-all cursor-pointer ${getCategoryButtonClass(
               cat,
               selectedCategory === cat
             )}`}
@@ -162,23 +162,23 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       {/* View Mode: GRID */}
       {viewMode === 'grid' && (
         <div className="overflow-x-auto">
-          <div className="min-w-[650px]">
+          <div className="min-w-[650px] bg-slate-100/60 p-3 sm:p-4 rounded-2xl border border-slate-200/80">
             {/* Days of week header */}
-            <div className="grid grid-cols-7 gap-1 text-center font-bold text-xs text-slate-400 uppercase tracking-wider mb-2">
-              <div>Ahad</div>
-              <div>Isnin</div>
-              <div>Selasa</div>
-              <div>Rabu</div>
-              <div>Khamis</div>
-              <div>Jumaat</div>
-              <div>Sabtu</div>
+            <div className="grid grid-cols-7 gap-2 text-center font-bold text-xs text-slate-600 uppercase tracking-wider mb-2.5 px-0.5">
+              <div className="py-1">Ahad</div>
+              <div className="py-1">Isnin</div>
+              <div className="py-1">Selasa</div>
+              <div className="py-1">Rabu</div>
+              <div className="py-1">Khamis</div>
+              <div className="py-1">Jumaat</div>
+              <div className="py-1">Sabtu</div>
             </div>
 
             {/* Calendar Days Matrix */}
             <div className="grid grid-cols-7 gap-2">
               {/* Blank offset boxes */}
               {Array.from({ length: firstDayOfWeek }).map((_, idx) => (
-                <div key={`blank-${idx}`} className="h-28 bg-slate-50/40 rounded-2xl border border-slate-100/50 opacity-40" />
+                <div key={`blank-${idx}`} className="h-28 bg-slate-200/25 rounded-xl sm:rounded-2xl border border-slate-200/50 opacity-40" />
               ))}
 
               {/* Day boxes */}
@@ -190,10 +190,10 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                 return (
                   <div
                     key={`day-${dayNum}`}
-                    className={`h-28 rounded-2xl p-2 border flex flex-col justify-between transition-all ${
+                    className={`h-28 rounded-xl sm:rounded-2xl p-2 border flex flex-col justify-between transition-all ${
                       isToday
-                        ? 'bg-indigo-50/80 border-indigo-300 shadow-2xs ring-2 ring-indigo-200/60'
-                        : 'bg-white/80 border-slate-200/80 hover:border-indigo-200'
+                        ? 'bg-indigo-50/90 border-indigo-300 shadow-2xs ring-2 ring-indigo-400/30'
+                        : 'bg-white border-slate-200/90 hover:border-indigo-300 hover:shadow-2xs'
                     }`}
                   >
                     <div className="flex items-center justify-between">
@@ -238,7 +238,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       {viewMode === 'agenda' && (
         <div className="space-y-3">
           {filteredEvents.length === 0 ? (
-            <div className="text-center py-10 text-slate-500 text-xs">
+            <div className="text-center py-10 text-slate-500 text-xs bg-white rounded-2xl border border-slate-200/80">
               Tiada event berjadual untuk bulan {monthNamesMalay[currentMonth]} {currentYear} bagi kategori ini.
             </div>
           ) : (
@@ -248,7 +248,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                 <div
                   key={evt.id}
                   onClick={() => onViewDetails(evt)}
-                  className="bg-white/80 border border-slate-200/80 hover:border-indigo-300 rounded-2xl p-4 flex items-center justify-between gap-4 cursor-pointer transition-all shadow-2xs"
+                  className="bg-white border border-slate-200/90 hover:border-indigo-300 rounded-2xl p-4 flex items-center justify-between gap-4 cursor-pointer transition-all shadow-2xs"
                 >
                   <div className="flex items-center gap-4">
                     <div className="text-center bg-indigo-50 border border-indigo-100 px-3 py-2 rounded-xl shrink-0">
@@ -276,7 +276,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                     </div>
                   </div>
 
-                  <button className="hidden sm:block px-3 py-1.5 rounded-xl bg-indigo-50 text-indigo-700 text-xs font-bold hover:bg-indigo-600 hover:text-white transition-colors">
+                  <button className="hidden sm:block px-3 py-1.5 rounded-xl bg-indigo-50 text-indigo-700 text-xs font-bold hover:bg-indigo-600 hover:text-white transition-colors cursor-pointer">
                     Lihat Detail
                   </button>
                 </div>
