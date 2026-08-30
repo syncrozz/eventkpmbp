@@ -10,7 +10,6 @@ import {
   updateRegistrationInFirestore,
   getLocalEventsCache,
   saveLocalEventsCache,
-  seedEventsIfEmpty,
   getLocalHeroConfigCache,
   saveLocalHeroConfigCache,
   subscribeToHeroConfig as subscribeToFirestoreHeroConfig,
@@ -46,18 +45,13 @@ export function subscribeToAllEvents(
 ): () => void {
   return subscribeToFirestoreEvents(
     (firestoreEvents) => {
-      if (Array.isArray(firestoreEvents) && firestoreEvents.length > 0) {
-        saveLocalEventsCache(firestoreEvents);
-        onUpdate(firestoreEvents);
-      } else {
-        const cached = getLocalEventsCache();
-        onUpdate(cached.length > 0 ? cached : INITIAL_EVENTS);
-      }
+      saveLocalEventsCache(firestoreEvents);
+      onUpdate(firestoreEvents);
     },
     (err) => {
       console.warn('Firestore subscription notice (using local cache):', err?.message || err);
       const cached = getLocalEventsCache();
-      onUpdate(cached.length > 0 ? cached : INITIAL_EVENTS);
+      onUpdate(cached);
       if (onError) onError(err);
     }
   );
@@ -90,14 +84,6 @@ export async function deleteExistingEvent(id: string): Promise<void> {
 export async function saveNewRegistration(record: RegistrationRecord): Promise<string> {
   await saveRegistrationToFirestore(record);
   return record.id;
-}
-
-/**
- * Reset and seed default official demo events into Firestore
- */
-export async function resetAndSeedDemoEvents(): Promise<void> {
-  saveLocalEventsCache(INITIAL_EVENTS);
-  await seedEventsIfEmpty(true);
 }
 
 /**

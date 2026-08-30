@@ -69,7 +69,6 @@ interface AdminPortalProps {
   onDeleteEvent: (event: KpmbpEvent) => void;
   initialEditingEvent?: KpmbpEvent | null;
   onClearInitialEditingEvent?: () => void;
-  onSeedSampleData?: () => void;
   onBulkImportEvents?: (events: KpmbpEvent[], replaceAll: boolean) => Promise<void>;
   heroConfig?: HeroConfig;
   onSaveHeroConfig?: (config: HeroConfig) => Promise<void> | void;
@@ -83,7 +82,6 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   onDeleteEvent,
   initialEditingEvent,
   onClearInitialEditingEvent,
-  onSeedSampleData,
   onBulkImportEvents,
   heroConfig,
   onSaveHeroConfig,
@@ -647,60 +645,42 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
   return (
     <div className="space-y-6">
-      
-      {/* Admin Title Card */}
-      <div className="bg-white/60 backdrop-blur-xl border border-white/80 rounded-2xl p-4 sm:p-5 shadow-sm">
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-900 text-white rounded-full text-xs font-bold uppercase tracking-wider">
-            <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            <span>Portal Pentadbir Event</span>
-          </div>
-          
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-full text-[11px] font-bold">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <Cloud className="w-3.5 h-3.5 text-indigo-600" />
-            <span>Firebase Firestore Cloud (Live Sync)</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Admin Navigation & Action Toolbar (Organized in 2 Structured Rows) */}
-      <div className="bg-white/70 backdrop-blur-xl border border-slate-200/80 rounded-3xl p-3.5 sm:p-4 shadow-sm space-y-3">
-        
-        {/* ROW 1: Primary Navigation Tabs */}
-        <div className="flex flex-wrap items-center gap-2">
+      {/* Admin Navigation & Action Toolbar */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+        {/* Navigation Tabs */}
+        <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-200/60 backdrop-blur-md rounded-2xl border border-slate-200/80 w-fit">
           {/* Tab 1: Senarai Acara */}
           <button
             id="admin-tab-events"
             type="button"
             onClick={() => setActiveAdminTab('events')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
               activeAdminTab === 'events'
-                ? 'bg-slate-900 text-white shadow-sm'
-                : 'text-slate-600 hover:bg-slate-100'
+                ? 'bg-slate-900 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
             }`}
           >
             <span>Senarai Acara</span>
             <span className={`px-2 py-0.5 rounded-full text-[10px] ${
-              activeAdminTab === 'events' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700 font-bold'
+              activeAdminTab === 'events' ? 'bg-white/20 text-white' : 'bg-slate-300 text-slate-700 font-bold'
             }`}>
               {events.length}
             </span>
           </button>
 
-          {/* Tab 2: Rekod Pendaftaran Peserta */}
+          {/* Tab 2: Pendaftaran Peserta */}
           <button
             id="admin-tab-registrations"
             type="button"
             onClick={() => setActiveAdminTab('registrations')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
               activeAdminTab === 'registrations'
-                ? 'bg-slate-900 text-white shadow-sm'
-                : 'text-slate-600 hover:bg-slate-100'
+                ? 'bg-slate-900 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
             }`}
           >
             <Users className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Rekod Pendaftaran Peserta</span>
+            <span>Pendaftaran Peserta</span>
             <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
               activeAdminTab === 'registrations' ? 'bg-emerald-500 text-white' : 'bg-emerald-100 text-emerald-800'
             }`}>
@@ -708,19 +688,19 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
             </span>
           </button>
 
-          {/* Tab 3: Hero Carousel & Komunikasi */}
+          {/* Tab 3: Carousel */}
           <button
             id="admin-tab-hero"
             type="button"
             onClick={() => setActiveAdminTab('hero')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
               activeAdminTab === 'hero'
-                ? 'bg-slate-900 text-white shadow-sm'
-                : 'text-slate-600 hover:bg-slate-100'
+                ? 'bg-slate-900 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
             }`}
           >
             <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-            <span>Hero Carousel & Komunikasi</span>
+            <span>Carousel</span>
             <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
               activeAdminTab === 'hero' ? 'bg-amber-400 text-slate-950' : 'bg-amber-100 text-amber-900'
             }`}>
@@ -733,10 +713,10 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
             id="admin-tab-submissions"
             type="button"
             onClick={() => setActiveAdminTab('submissions')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer relative ${
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer relative ${
               activeAdminTab === 'submissions'
-                ? 'bg-slate-900 text-white shadow-sm'
-                : 'text-slate-600 hover:bg-slate-100'
+                ? 'bg-slate-900 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
             }`}
           >
             <FileText className="w-3.5 h-3.5 text-indigo-400" />
@@ -746,7 +726,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                 ? 'bg-indigo-500 text-white'
                 : submissions.filter(s => s.status === 'PENDING').length > 0
                 ? 'bg-amber-500 text-white animate-pulse'
-                : 'bg-slate-200 text-slate-700'
+                : 'bg-slate-300 text-slate-700'
             }`}>
               {submissions.filter(s => s.status === 'PENDING').length > 0 
                 ? `${submissions.filter(s => s.status === 'PENDING').length} Menunggu`
@@ -755,9 +735,9 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
           </button>
         </div>
 
-        {/* ROW 2: Primary Management & Creation Action Buttons */}
+        {/* Action Toolbar */}
         {!isCreating && !editingEvent && (
-          <div className="flex flex-wrap items-center gap-2 pt-2.5 border-t border-slate-200/70">
+          <div className="flex flex-wrap items-center gap-2">
             {/* Hidden CSV File Input */}
             <input
               ref={csvFileInputRef}
@@ -767,12 +747,12 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
               onChange={handleCsvFileSelect}
             />
 
-            {/* 1. [ Eksport Pendaftaran ] */}
+            {/* Eksport Pendaftaran */}
             <button
               id="admin-btn-export-registrations"
               type="button"
               onClick={handleExportRegistrationsCSV}
-              className="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all border border-emerald-200/80 cursor-pointer shadow-2xs"
+              className="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all border border-emerald-200/80 cursor-pointer shadow-2xs"
               title="Eksport senarai pendaftaran pelajar ke fail CSV / Excel"
             >
               <FileDown className="w-3.5 h-3.5 text-emerald-700" />
@@ -783,11 +763,11 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
             </button>
 
             {/* CSV Backup & Import Tools for Events */}
-            <div className="flex items-center gap-1 bg-slate-100/90 p-0.5 rounded-xl border border-slate-200/80">
+            <div className="flex items-center gap-1 bg-white/80 p-0.5 rounded-xl border border-slate-200/80 shadow-2xs">
               <button
                 type="button"
                 onClick={handleExportEventsCSV}
-                className="hover:bg-white text-slate-700 hover:text-slate-900 px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-all cursor-pointer"
+                className="hover:bg-slate-100 text-slate-700 hover:text-slate-900 px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1 transition-all cursor-pointer"
                 title="Eksport semua acara ke CSV"
               >
                 <FileSpreadsheet className="w-3 h-3 text-indigo-600" />
@@ -796,7 +776,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
               <button
                 type="button"
                 onClick={() => csvFileInputRef.current?.click()}
-                className="hover:bg-white text-slate-700 hover:text-slate-900 px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-all cursor-pointer"
+                className="hover:bg-slate-100 text-slate-700 hover:text-slate-900 px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1 transition-all cursor-pointer"
                 title="Import acara daripada CSV"
               >
                 <FileUp className="w-3 h-3 text-indigo-700" />
@@ -805,47 +785,33 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
               <button
                 type="button"
                 onClick={handleDownloadTemplate}
-                className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg text-xs transition-colors"
+                className="text-slate-400 hover:text-slate-700 p-1 rounded-lg text-xs transition-colors"
                 title="Muat turun templat CSV kosong"
               >
                 <HelpCircle className="w-3 h-3" />
               </button>
             </div>
 
-            {/* 2. [ Muat Semula Sampel ] */}
-            {onSeedSampleData && (
-              <button
-                id="admin-btn-seed-sample"
-                type="button"
-                onClick={onSeedSampleData}
-                className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all border border-slate-200/80 cursor-pointer"
-                title="Muat semula set acara sampel default KPMBP"
-              >
-                <RefreshCw className="w-3.5 h-3.5 text-slate-600" />
-                <span>Muat Semula Sampel</span>
-              </button>
-            )}
-
-            {/* 3. [ Cipta Acara Sekali ] */}
+            {/* Cipta Acara */}
             <button
               id="admin-btn-create-event"
               type="button"
               onClick={() => handleStartCreate('ONE_TIME_EVENT')}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold shadow-md shadow-indigo-200 flex items-center gap-1.5 transition-all cursor-pointer sm:ml-auto"
+              className="bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-1.5 rounded-xl text-xs font-bold shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
             >
               <Plus className="w-4 h-4" />
-              <span>Cipta Acara Sekali</span>
+              <span>Acara</span>
             </button>
 
-            {/* 4. [ Cipta Program Berterusan ] */}
+            {/* Cipta Program Berterusan */}
             <button
               id="admin-btn-create-ongoing"
               type="button"
               onClick={() => handleStartCreate('ONGOING_PROGRAM')}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold shadow-md shadow-emerald-200 flex items-center gap-1.5 transition-all cursor-pointer"
+              className="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-1.5 rounded-xl text-xs font-bold shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
             >
-              <Repeat className="w-4 h-4" />
-              <span>Cipta Program Berterusan</span>
+              <Plus className="w-4 h-4" />
+              <span>Program Berterusan</span>
             </button>
           </div>
         )}
@@ -1897,9 +1863,6 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                 <Users className="w-4 h-4 text-emerald-600" />
                 <span>Rekod Pendaftaran Pelajar (Disimpan di Firebase)</span>
               </h3>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Pengurusan pendaftaran pelajar: Klik WhatsApp untuk auto terus ke nombor <span className="font-semibold text-emerald-700">wa.me/6...</span> bersama draf Maklumat Pendaftaran bagi pengesahan.
-              </p>
             </div>
 
             <div className="flex flex-wrap items-center gap-2">

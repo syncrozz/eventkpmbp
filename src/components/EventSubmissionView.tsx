@@ -463,60 +463,6 @@ export const EventSubmissionView: React.FC<EventSubmissionViewProps> = ({
             <span>Kembali</span>
           </button>
         </div>
-
-        {/* Dedicated Direct Link Share Box for Organizers */}
-        <div className="mt-5 p-4 bg-gradient-to-r from-indigo-50/90 via-slate-50 to-indigo-50/60 border border-indigo-200/80 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-2xs">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <span className="px-2 py-0.5 bg-indigo-600 text-white rounded text-[10px] font-black uppercase tracking-wider">
-                Pautan Terus (Direct URL)
-              </span>
-              <span className="text-xs font-bold text-slate-800">
-                Pautan Khusus Untuk Diberikan Kepada Penganjur
-              </span>
-            </div>
-            <div className="text-[11px] sm:text-xs font-mono text-indigo-900 bg-white/95 px-3 py-1.5 rounded-lg border border-indigo-100/90 select-all break-all flex items-center gap-1.5 shadow-2xs">
-              <LinkIcon className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
-              <span>{typeof window !== 'undefined' ? `${window.location.origin}${window.location.pathname}#hantar-event` : '#hantar-event'}</span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              type="button"
-              onClick={handleCopyDirectLink}
-              className={`px-3.5 py-2 rounded-xl text-xs font-bold shadow-xs flex items-center gap-1.5 transition-all cursor-pointer ${
-                isCopied 
-                  ? 'bg-emerald-600 text-white' 
-                  : 'bg-indigo-600 hover:bg-indigo-700 text-white active:scale-95'
-              }`}
-            >
-              {isCopied ? <Check className="w-4 h-4 text-white" /> : <Copy className="w-4 h-4" />}
-              <span>{isCopied ? 'Telah Disalin!' : 'Salin Pautan'}</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={handleShareWhatsApp}
-              className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer"
-              title="Kongsi pautan borang ini ke WhatsApp penganjur"
-            >
-              <Share2 className="w-4 h-4" />
-              <span>WhatsApp</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Guidance Note */}
-        <div className="mt-4 p-3.5 bg-blue-50/70 border border-blue-200/80 rounded-2xl flex items-start gap-3 text-xs text-blue-900">
-          <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-          <div className="space-y-0.5">
-            <p className="font-bold">Makluman Proses Semakan:</p>
-            <p className="text-blue-800 leading-relaxed">
-              Semua event yang dihantar akan melalui proses semakan pentadbir sebelum dipaparkan di portal dan kalendar rasmi. Pastikan tarikh, pautan dan maklumat penganjur adalah tepat.
-            </p>
-          </div>
-        </div>
       </div>
 
       {/* Submission Form */}

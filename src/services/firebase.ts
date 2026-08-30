@@ -165,35 +165,6 @@ export function saveLocalSubmissionsCache(submissions: EventSubmission[]): void 
 }
 
 /**
- * Seeds initial event data into Firestore if collection is empty or when manually requested.
- */
-export async function seedEventsIfEmpty(force = false): Promise<void> {
-  try {
-    const eventsRef = collection(db, EVENTS_COLLECTION);
-    
-    // Only attempt seed if not quota blocked or when user explicitly requested
-    if (force) {
-      const batch = writeBatch(db);
-      for (const event of INITIAL_EVENTS) {
-        const docRef = doc(db, EVENTS_COLLECTION, event.id);
-        const payload = sanitizeForFirestore({
-          ...event,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        });
-        batch.set(docRef, payload);
-      }
-      await batch.commit();
-    }
-    saveLocalEventsCache(INITIAL_EVENTS);
-    try { localStorage.setItem('kpmbp_has_seeded', 'true'); } catch {}
-  } catch (error: any) {
-    console.warn('Notice: Firestore seeding skipped or quota reached, using local dataset.', error?.message);
-    saveLocalEventsCache(INITIAL_EVENTS);
-  }
-}
-
-/**
  * Subscribes to real-time events updates in Firestore with automatic offline/quota fallback.
  */
 export function subscribeToEvents(
@@ -212,19 +183,11 @@ export function subscribeToEvents(
   try {
     unsubscribe = onSnapshot(
       eventsRef,
-      async (snapshot) => {
+      (snapshot) => {
         if (snapshot.empty) {
-          const alreadySeeded = typeof window !== 'undefined' && localStorage.getItem('kpmbp_has_seeded') === 'true';
-          if (!alreadySeeded) {
-            try { localStorage.setItem('kpmbp_has_seeded', 'true'); } catch {}
-            await seedEventsIfEmpty(true);
-            onUpdate(INITIAL_EVENTS);
-            return;
-          } else {
-            onUpdate([]);
-            saveLocalEventsCache([]);
-            return;
-          }
+          onUpdate([]);
+          saveLocalEventsCache([]);
+          return;
         }
 
         const eventsList: KpmbpEvent[] = [];
@@ -359,14 +322,14 @@ export async function saveRegistrationToFirestore(record: RegistrationRecord): P
   const nextList = [record, ...localList.filter((r) => r.id !== record.id)];
   saveLocalRegistrationsCache(nextList);
 
-  // 2. Attempt Firestore sync
+  // 2. Attempt Firestore sync with deterministic document ID (record.id)
   try {
-    const regRef = collection(db, REGISTRATIONS_COLLECTION);
+    const docRef = doc(db, REGISTRATIONS_COLLECTION, record.id);
     const payload = sanitizeForFirestore({
       ...record,
       createdAt: serverTimestamp()
     });
-    await addDoc(regRef, payload);
+    await setDoc(docRef, payload, { merge: true });
   } catch (error: any) {
     console.warn('Registration saved to local storage (Cloud sync notice):', error?.message);
     // Don't throw if local was saved successfully

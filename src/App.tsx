@@ -21,7 +21,6 @@ import {
   updateExistingEvent,
   deleteExistingEvent,
   saveNewRegistration,
-  resetAndSeedDemoEvents,
   bulkImportEvents,
   getActiveBackendLabel,
   getActiveBackendType,
@@ -103,7 +102,7 @@ export default function App() {
   useEffect(() => {
     const unsubscribeEvents = subscribeToAllEvents(
       (incomingEvents) => {
-        if (Array.isArray(incomingEvents) && incomingEvents.length > 0) {
+        if (Array.isArray(incomingEvents)) {
           setEvents(incomingEvents);
           setIsFirebaseConnected(true);
         }
@@ -446,18 +445,6 @@ export default function App() {
     }
     setCurrentTab('admin');
     showToast(`Membuka borang suntingan untuk "${evt.title}"`);
-  };
-
-  const handleSeedSampleData = async () => {
-    try {
-      showToast('Memuat semula set 3 acara contoh rasmi KPMBP...');
-      setEvents(INITIAL_EVENTS);
-      await resetAndSeedDemoEvents();
-      showToast('3 Acara demo KPMBP berjaya dimuatkan semula!');
-    } catch (err) {
-      console.error('Error seeding data:', err);
-      showToast('Gagal memuat semula data contoh.');
-    }
   };
 
   const handleBulkImportEvents = async (importedEvents: KpmbpEvent[], replaceAll: boolean) => {
@@ -875,7 +862,6 @@ export default function App() {
             isAdmin={isAdminUnlocked}
             onEdit={handleTriggerEdit}
             onDelete={handleRequestDelete}
-            onSeedSampleData={handleSeedSampleData}
           />
         )}
 
@@ -900,7 +886,6 @@ export default function App() {
                 onDeleteEvent={handleRequestDelete}
                 initialEditingEvent={editingEventInAdmin}
                 onClearInitialEditingEvent={() => setEditingEventInAdmin(null)}
-                onSeedSampleData={handleSeedSampleData}
                 onBulkImportEvents={handleBulkImportEvents}
                 heroConfig={heroConfig}
                 onSaveHeroConfig={handleSaveHeroConfig}

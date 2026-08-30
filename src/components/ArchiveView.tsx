@@ -17,7 +17,6 @@ interface ArchiveViewProps {
   isAdmin: boolean;
   onEdit?: (event: KpmbpEvent) => void;
   onDelete?: (event: KpmbpEvent) => void;
-  onSeedSampleData?: () => void;
 }
 
 export const ArchiveView: React.FC<ArchiveViewProps> = ({
@@ -28,8 +27,7 @@ export const ArchiveView: React.FC<ArchiveViewProps> = ({
   onToggleSave,
   isAdmin,
   onEdit,
-  onDelete,
-  onSeedSampleData
+  onDelete
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<EventCategory>('Semua');
@@ -269,20 +267,9 @@ export const ArchiveView: React.FC<ArchiveViewProps> = ({
               <button
                 type="button"
                 onClick={handleResetFilters}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-xs transition-all"
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer"
               >
                 Reset Semua Penapis
-              </button>
-            )}
-
-            {events.length === 0 && onSeedSampleData && (
-              <button
-                type="button"
-                onClick={onSeedSampleData}
-                className="px-4 py-2 bg-slate-900 hover:bg-black text-amber-300 text-xs font-extrabold rounded-xl shadow-xs transition-all flex items-center gap-1.5"
-              >
-                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                <span>Muat Rekod Acara Contoh (2025 & 2026)</span>
               </button>
             )}
           </div>
