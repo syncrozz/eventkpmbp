@@ -70,6 +70,17 @@
         "timestamp": { "type": "string", "description": "Registration timestamp" }
       },
       "required": ["eventId", "studentName", "studentId", "email", "phone", "programCode"]
+    },
+    "settings": {
+      "title": "Settings",
+      "description": "Application settings including Hero Carousel configuration",
+      "type": "object",
+      "properties": {
+        "autoPlay": { "type": "boolean", "description": "Whether hero auto rotates" },
+        "intervalSeconds": { "type": "number", "description": "Slide interval in seconds" },
+        "slides": { "type": "array", "description": "Hero carousel slides array" },
+        "updatedAt": { "type": "string", "description": "Last update timestamp" }
+      }
     }
   },
   "firestore": {

@@ -28,12 +28,12 @@ const designatedDbId = firebaseConfig.firestoreDatabaseId && firebaseConfig.fire
   ? firebaseConfig.firestoreDatabaseId
   : undefined;
 
-// Initialize primary and fallback instances with ignoreUndefinedProperties & auto-detect long polling
+// Initialize primary and fallback instances with ignoreUndefinedProperties & forced long polling
 let primaryDb;
 try {
   primaryDb = initializeFirestore(app, {
     ignoreUndefinedProperties: true,
-    experimentalAutoDetectLongPolling: true,
+    experimentalForceLongPolling: true,
   }, designatedDbId);
 } catch {
   primaryDb = designatedDbId ? getFirestore(app, designatedDbId) : getFirestore(app);

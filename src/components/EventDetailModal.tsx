@@ -6,7 +6,9 @@ import {
   formatDateDMY, 
   getGoogleCalendarUrl, 
   downloadIcsFile, 
-  getTimeRemainingMalay, 
+  getTimeRemainingMalay,
+  getTimeRemainingFromTimestampMalay,
+  getEventStartTimestamp,
   getCategoryBadgeClass, 
   getDynamicEventStatus,
   getEventShareText,
@@ -76,7 +78,31 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
   const { full: fullDateMalay } = formatDateMalay(event.date);
   const liveStatus = getDynamicEventStatus(event);
   const isOnline = event.eventMode === 'online';
-  const deadlineRemaining = !isOngoing ? getTimeRemainingMalay(isOnline ? event.submissionDeadline || event.registrationDeadline : event.registrationDeadline) : null;
+
+  // 1. Deadline calculation (Priority 1)
+  const deadlineIso = isOnline 
+    ? (event.submissionDeadline || event.registrationDeadline) 
+    : event.registrationDeadline;
+  const deadlineTimestamp = deadlineIso ? new Date(deadlineIso).getTime() : 0;
+  const hasActiveDeadline = 
+    !isOngoing && 
+    event.registrationMode !== 'none' && 
+    !isNaN(deadlineTimestamp) && 
+    deadlineTimestamp > Date.now();
+  const deadlineRemaining = hasActiveDeadline ? getTimeRemainingFromTimestampMalay(deadlineTimestamp) : null;
+
+  // 2. Event Start Countdown calculation (Priority 2 - when no active deadline & future event)
+  const eventStartTimestamp = !isOngoing ? getEventStartTimestamp(event) : Infinity;
+  const isFutureEvent = 
+    !isOngoing && 
+    !hasActiveDeadline && 
+    liveStatus !== 'Ongoing' && 
+    liveStatus !== 'Completed' && 
+    liveStatus !== 'Archived' && 
+    liveStatus !== 'Cancelled' && 
+    isFinite(eventStartTimestamp) && 
+    eventStartTimestamp > Date.now();
+  const eventStartRemaining = isFutureEvent ? getTimeRemainingFromTimestampMalay(eventStartTimestamp) : null;
 
   const handleCopyInfo = () => {
     const fullText = getEventShareText(event);
@@ -303,23 +329,38 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
             </div>
           </div>
 
-          {/* Registration Deadline Warning Banner (ONE_TIME_EVENT only) */}
-          {!isOngoing && event.registrationMode !== 'none' && deadlineRemaining && (
+          {/* Dynamic Countdown / Alert Banner */}
+          {hasActiveDeadline && deadlineRemaining ? (
+            /* Mode 1: Active Registration / Submission Deadline Alert (RED) */
             <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 text-xs text-rose-900 flex items-start gap-3">
               <ShieldAlert className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
               <div>
                 <div className="font-extrabold text-rose-700 uppercase tracking-wide text-[10px]">
                   Peringatan Pendaftaran / Penyerahan
                 </div>
-                <div className="font-bold text-sm mt-0.5">{deadlineRemaining}</div>
-                {(event.submissionDeadline || event.registrationDeadline) && (
+                <div className="font-bold text-sm mt-0.5 text-rose-950">{deadlineRemaining}</div>
+                {deadlineIso && (
                   <div className="text-slate-600 text-[11px] font-medium mt-0.5">
-                    Tarikh tutup: <span className="font-bold text-slate-800">{formatDeadlineMalay(event.submissionDeadline || event.registrationDeadline)}</span>
+                    Tarikh tutup: <span className="font-bold text-slate-800">{formatDeadlineMalay(deadlineIso)}</span>
                   </div>
                 )}
               </div>
             </div>
-          )}
+          ) : isFutureEvent && eventStartRemaining ? (
+            /* Mode 2: Upcoming Event Start Countdown (BLUE) */
+            <div className="bg-sky-50 border border-sky-200 rounded-2xl p-4 text-xs text-sky-900 flex items-start gap-3">
+              <Clock className="w-5 h-5 text-sky-600 shrink-0 mt-0.5" />
+              <div>
+                <div className="font-extrabold text-sky-700 uppercase tracking-wide text-[10px]">
+                  Countdown Acara
+                </div>
+                <div className="font-bold text-sm mt-0.5 text-sky-950">{eventStartRemaining}</div>
+                <div className="text-slate-600 text-[11px] font-medium mt-0.5">
+                  Acara bermula: <span className="font-bold text-slate-800">{fullDateMalay}{event.startTime ? ` · ${event.startTime}` : ''}</span>
+                </div>
+              </div>
+            </div>
+          ) : null}
 
           {/* Detailed Schedule & Session Breakdown (For ONGOING_PROGRAM) */}
           {isOngoing && event.scheduleSessions && event.scheduleSessions.length > 0 && (

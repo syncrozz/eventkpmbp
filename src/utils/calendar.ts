@@ -489,13 +489,14 @@ export function formatDateMalay(dateStr?: string): { day: string; month: string;
   }
 }
 
-export function getTimeRemainingMalay(deadlineIsoStr?: string): string | null {
-  if (!deadlineIsoStr) return null;
-  const deadline = new Date(deadlineIsoStr).getTime();
-  const now = new Date().getTime();
-  const diff = deadline - now;
-
-  if (diff <= 0) return 'Pendaftaran telah ditutup';
+/**
+ * Calculates remaining human-readable countdown string in Malay from a timestamp.
+ * Returns null if timestamp is in the past, invalid, or infinity.
+ */
+export function getTimeRemainingFromTimestampMalay(targetTimestamp?: number, nowTimestamp = Date.now()): string | null {
+  if (!targetTimestamp || !isFinite(targetTimestamp)) return null;
+  const diff = targetTimestamp - nowTimestamp;
+  if (diff <= 0) return null;
 
   const hours = Math.floor(diff / (1000 * 60 * 60));
   const days = Math.floor(hours / 24);
@@ -510,6 +511,17 @@ export function getTimeRemainingMalay(deadlineIsoStr?: string): string | null {
     const mins = Math.floor(diff / (1000 * 60));
     return `Tinggal ${mins} minit lagi!`;
   }
+}
+
+export function getTimeRemainingMalay(deadlineIsoStr?: string, nowTimestamp = Date.now()): string | null {
+  if (!deadlineIsoStr) return null;
+  const deadline = new Date(deadlineIsoStr).getTime();
+  if (isNaN(deadline)) return null;
+  const diff = deadline - nowTimestamp;
+
+  if (diff <= 0) return 'Pendaftaran telah ditutup';
+
+  return getTimeRemainingFromTimestampMalay(deadline, nowTimestamp);
 }
 
 export function getGoogleCalendarUrl(event: KpmbpEvent): string {

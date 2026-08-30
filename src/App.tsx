@@ -13,7 +13,7 @@ import { AdminPortal } from './components/AdminPortal';
 import { AdminPinModal } from './components/AdminPinModal';
 import { DeleteConfirmationModal } from './components/DeleteConfirmationModal';
 import { Footer } from './components/Footer';
-import { sortEventsByNearestDue, getCategoryButtonClass, isEventArchived, isOngoingProgram } from './utils/calendar';
+import { sortEventsByNearestDue, getCategoryButtonClass, isEventArchived, isOngoingProgram, getDynamicEventStatus } from './utils/calendar';
 import { 
   subscribeToAllEvents,
   createNewEvent,
@@ -236,14 +236,22 @@ export default function App() {
   const ongoingPrograms = activeEvents.filter((e) => isOngoingProgram(e));
   const activeOneTimeEvents = activeEvents.filter((e) => !isOngoingProgram(e));
 
-  // Urgent events count (active one-time events closing soon)
-  const urgentCount = activeOneTimeEvents.filter(
-    (e) => e.status === 'Registration Closing Soon' || (e.seatsLeft !== undefined && e.seatsLeft <= 5)
-  ).length;
+  // Urgent events count (active one-time events requiring registration with closing deadlines or low seats)
+  const urgentCount = activeOneTimeEvents.filter((e) => {
+    if (e.registrationMode === 'none') return false;
+    const dynamicStatus = getDynamicEventStatus(e);
+    if (dynamicStatus === 'Registration Closing Soon') return true;
+    if (dynamicStatus === 'Registration Open' && e.seatsLeft !== undefined && e.seatsLeft > 0 && e.seatsLeft <= 5) {
+      return true;
+    }
+    return false;
+  }).length;
 
-  const openRegistrationCount = activeEvents.filter(
-    (e) => e.status === 'Registration Open' || e.status === 'Registration Closing Soon'
-  ).length;
+  const openRegistrationCount = activeEvents.filter((e) => {
+    if (e.registrationMode === 'none') return false;
+    const dynamicStatus = getDynamicEventStatus(e);
+    return dynamicStatus === 'Registration Open' || dynamicStatus === 'Registration Closing Soon';
+  }).length;
 
   // Base list depending on tab & filter mode:
   // - Archive: archived events
