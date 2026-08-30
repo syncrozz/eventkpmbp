@@ -488,7 +488,7 @@ export default function App() {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/60 pb-3">
                   <div>
                     <h2 className="text-xs font-extrabold uppercase tracking-[0.2em] text-slate-400">
-                      {showOngoingOnly ? 'PROGRAM BERTERUSAN' : 'AKAN DATANG DI KPMBP'}
+                      {showOngoingOnly ? 'PROGRAM BERTERUSAN' : 'AKAN DATANG'}
                     </h2>
                   </div>
 
@@ -806,6 +806,7 @@ export default function App() {
                 onBulkImportEvents={handleBulkImportEvents}
                 heroConfig={heroConfig}
                 onSaveHeroConfig={handleSaveHeroConfig}
+                onShowToast={showToast}
               />
             ) : (
               <div className="max-w-md mx-auto my-12 bg-white/80 backdrop-blur-xl border border-slate-200/80 rounded-3xl p-8 text-center space-y-5 shadow-xl">

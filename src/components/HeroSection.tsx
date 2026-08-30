@@ -19,25 +19,32 @@ import {
 import { ViewTab, HeroConfig, HeroSlide, DEFAULT_HERO_CONFIG, KpmbpEvent, HeroCtaAction } from '../types';
 
 interface HeroSectionProps {
+  heroConfig?: HeroConfig;
   config?: HeroConfig;
   onSelectTab: (tab: ViewTab) => void;
   onOpenEventDetail?: (event: KpmbpEvent) => void;
+  onViewDetails?: (event: KpmbpEvent) => void;
   onOpenEventById?: (eventId: string) => void;
   events?: KpmbpEvent[];
   openCount: number;
   urgentCount: number;
+  selectedCategory?: string;
+  onSelectCategory?: (category: any) => void;
 }
 
 export const HeroSection: React.FC<HeroSectionProps> = ({
-  config = DEFAULT_HERO_CONFIG,
+  heroConfig,
+  config,
   onSelectTab,
   onOpenEventDetail,
+  onViewDetails,
   onOpenEventById,
   events = [],
   openCount,
   urgentCount
 }) => {
-  const activeSlides = (config?.slides || DEFAULT_HERO_CONFIG.slides).filter((s) => s.enabled);
+  const effectiveConfig = heroConfig || config || DEFAULT_HERO_CONFIG;
+  const activeSlides = (effectiveConfig?.slides || DEFAULT_HERO_CONFIG.slides).filter((s) => s.enabled);
   const slidesToDisplay: HeroSlide[] = activeSlides.length > 0 ? activeSlides : [DEFAULT_HERO_CONFIG.slides[0]];
   const isCarousel = slidesToDisplay.length > 1;
 
@@ -55,15 +62,15 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
 
   // Auto-play timer
   useEffect(() => {
-    if (!isCarousel || isPaused || config.autoPlay === false) return;
+    if (!isCarousel || isPaused || effectiveConfig.autoPlay === false) return;
 
-    const intervalMs = Math.max(3, config.intervalSeconds || 6) * 1000;
+    const intervalMs = Math.max(3, effectiveConfig.intervalSeconds || 6) * 1000;
     const timer = setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % slidesToDisplay.length);
     }, intervalMs);
 
     return () => clearInterval(timer);
-  }, [isCarousel, isPaused, config.autoPlay, config.intervalSeconds, slidesToDisplay.length]);
+  }, [isCarousel, isPaused, effectiveConfig.autoPlay, effectiveConfig.intervalSeconds, slidesToDisplay.length]);
 
   const currentSlide = slidesToDisplay[currentIndex] || slidesToDisplay[0];
 
@@ -99,6 +106,8 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
   const executeCtaAction = (action?: HeroCtaAction | 'none', target?: string) => {
     if (!action || action === 'none') return;
 
+    const detailHandler = onViewDetails || onOpenEventDetail;
+
     switch (action) {
       case 'tab_calendar':
         onSelectTab('calendar');
@@ -116,9 +125,9 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
         if (target) {
           if (onOpenEventById) {
             onOpenEventById(target);
-          } else if (onOpenEventDetail && events.length > 0) {
+          } else if (detailHandler && events.length > 0) {
             const found = events.find((e) => e.id === target);
-            if (found) onOpenEventDetail(found);
+            if (found) detailHandler(found);
           }
         } else {
           onSelectTab('events');
@@ -410,12 +419,12 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               <div className="relative w-full max-w-sm sm:max-w-md lg:max-w-sm h-48 sm:h-52 md:h-56 rounded-2xl overflow-hidden shadow-sm border border-slate-100/90 bg-slate-900/5 group">
                 {currentSlide.imageUrl && !imageLoadError[currentSlide.imageUrl] ? (
                   <img
+                    key={currentSlide.imageUrl}
                     src={currentSlide.imageUrl}
                     alt={currentSlide.imageAlt || currentSlide.title}
                     className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                     loading="eager"
                     referrerPolicy="no-referrer"
-                    crossOrigin="anonymous"
                     onError={() => {
                       if (currentSlide.imageUrl) {
                         setImageLoadError((prev) => ({ ...prev, [currentSlide.imageUrl!]: true }));

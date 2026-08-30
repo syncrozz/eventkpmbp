@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
   HeroConfig, 
   HeroSlide, 
@@ -30,7 +30,10 @@ import {
   Pause,
   HelpCircle,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Trash2,
+  Loader2,
+  Link as LinkIcon
 } from 'lucide-react';
 import { optimizeEventImage } from '../utils/imageOptimizer';
 
@@ -38,12 +41,14 @@ interface AdminHeroManagerProps {
   heroConfig?: HeroConfig;
   events: KpmbpEvent[];
   onSaveHeroConfig?: (config: HeroConfig) => Promise<void> | void;
+  onShowToast?: (msg: string) => void;
 }
 
 export const AdminHeroManager: React.FC<AdminHeroManagerProps> = ({
   heroConfig,
   events,
-  onSaveHeroConfig
+  onSaveHeroConfig,
+  onShowToast
 }) => {
   const [config, setConfig] = useState<HeroConfig>(() => {
     return heroConfig && Array.isArray(heroConfig.slides) && heroConfig.slides.length > 0
@@ -55,6 +60,8 @@ export const AdminHeroManager: React.FC<AdminHeroManagerProps> = ({
   const [previewSlideIndex, setPreviewSlideIndex] = useState<number>(0);
   const [isSaving, setIsSaving] = useState(false);
   const [saveToast, setSaveToast] = useState<string | null>(null);
+  const [isCompressingImage, setIsCompressingImage] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Sync if prop changes externally
   React.useEffect(() => {
@@ -63,9 +70,24 @@ export const AdminHeroManager: React.FC<AdminHeroManagerProps> = ({
     }
   }, [heroConfig]);
 
+  // Track if current configuration has unsaved modifications
+  const isDirty = React.useMemo(() => {
+    try {
+      const savedStr = JSON.stringify(heroConfig || DEFAULT_HERO_CONFIG);
+      const currentStr = JSON.stringify(config);
+      return savedStr !== currentStr;
+    } catch {
+      return false;
+    }
+  }, [heroConfig, config]);
+
   const showNotification = (msg: string) => {
-    setSaveToast(msg);
-    setTimeout(() => setSaveToast(null), 3500);
+    if (onShowToast) {
+      onShowToast(msg);
+    } else {
+      setSaveToast(msg);
+      setTimeout(() => setSaveToast(null), 3500);
+    }
   };
 
   const handleUpdateSlide = (slideIndex: number, field: keyof HeroSlide, value: any) => {
@@ -102,6 +124,33 @@ export const AdminHeroManager: React.FC<AdminHeroManagerProps> = ({
       return { ...prev, slides };
     });
     showNotification('Susunan Slide 1 dan Slide 2 telah berjaya ditukar!');
+  };
+
+  // Image Upload Handler with automatic compression
+  const handleHeroImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, slideIndex: number) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setIsCompressingImage(true);
+      // Automatically optimize to compressed WebP/base64 format (<200KB)
+      const optimizedBase64 = await optimizeEventImage(file, 1200, 700, 0.85);
+      handleUpdateSlide(slideIndex, 'imageUrl', optimizedBase64);
+      showNotification(`Gambar untuk Slide ${slideIndex + 1} berjaya dimuat naik & dimampatkan!`);
+    } catch (err: any) {
+      console.error('Error optimizing hero image:', err);
+      alert(err?.message || 'Gagal memproses fail gambar. Sila cuba format JPG atau PNG.');
+    } finally {
+      setIsCompressingImage(false);
+      if (e.target) {
+        e.target.value = '';
+      }
+    }
+  };
+
+  const handleRemoveHeroImage = (slideIndex: number) => {
+    handleUpdateSlide(slideIndex, 'imageUrl', '');
+    showNotification(`Gambar Slide ${slideIndex + 1} telah dipadam.`);
   };
 
   // Quick Preset Handlers
@@ -201,8 +250,9 @@ export const AdminHeroManager: React.FC<AdminHeroManagerProps> = ({
     try {
       if (onSaveHeroConfig) {
         await onSaveHeroConfig(config);
+      } else {
+        showNotification('Konfigurasi Hero Carousel berjaya disimpan & disegerakkan!');
       }
-      showNotification('Konfigurasi Hero Carousel berjaya disimpan & disegerakkan!');
     } catch (err: any) {
       console.error('Error saving hero config:', err);
       alert('Ralat semasa menyimpan tetapan: ' + (err?.message || 'Sila cuba lagi.'));
@@ -216,8 +266,9 @@ export const AdminHeroManager: React.FC<AdminHeroManagerProps> = ({
       setConfig(DEFAULT_HERO_CONFIG);
       if (onSaveHeroConfig) {
         await onSaveHeroConfig(DEFAULT_HERO_CONFIG);
+      } else {
+        showNotification('Hero Carousel telah dikembalikan kepada konfigurasi lalai (Default).');
       }
-      showNotification('Hero Carousel telah dikembalikan kepada konfigurasi lalai (Default).');
     }
   };
 
@@ -228,8 +279,8 @@ export const AdminHeroManager: React.FC<AdminHeroManagerProps> = ({
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       
-      {/* Toast */}
-      {saveToast && (
+      {/* Toast (Fallback only if no parent toast system is connected) */}
+      {saveToast && !onShowToast && (
         <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-2 text-xs font-bold border border-slate-700 animate-in slide-in-from-bottom-5">
           <CheckCircle2 className="w-4 h-4 text-emerald-400" />
           <span>{saveToast}</span>
@@ -579,36 +630,150 @@ export const AdminHeroManager: React.FC<AdminHeroManagerProps> = ({
             />
           </div>
 
-          {/* Field: Image URL */}
-          <div className="space-y-1.5 md:col-span-2">
-            <label className="text-xs font-extrabold text-slate-700 block">
-              URL Poster / Gambar Banner Slide
-            </label>
-            <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
-              <input
-                type="text"
-                value={currentSlide.imageUrl || ''}
-                onChange={(e) => handleUpdateSlide(activeSlideTab, 'imageUrl', e.target.value)}
-                placeholder="https://... (URL gambar)"
-                className="flex-1 bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-              />
-              
-              {/* Quick sample banner buttons */}
-              <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => handleUpdateSlide(activeSlideTab, 'imageUrl', 'https://raw.githubusercontent.com/syncrozz/syncrozz-assets/main/OGI/OGI.Event.v3.jpg')}
-                  className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[10px] font-bold"
-                >
-                  Banner OGI Rasmi
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleUpdateSlide(activeSlideTab, 'imageUrl', 'https://images.unsplash.com/photo-1506784983877-45594efa4cbe?q=80&w=1000&auto=format&fit=crop')}
-                  className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[10px] font-bold"
-                >
-                  Banner Kalendar
-                </button>
+          {/* Field: Image Banner Manager */}
+          <div className="space-y-3 md:col-span-2 bg-slate-50/80 border border-slate-200/80 rounded-2xl p-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <label className="text-xs font-extrabold text-slate-800 flex items-center gap-1.5">
+                <ImageIcon className="w-4 h-4 text-indigo-600" />
+                <span>Pengurusan Visual / Gambar Banner Slide</span>
+              </label>
+              <span className="text-[11px] text-slate-500 font-medium">
+                Format: JPG, PNG, WebP (Auto-dimampatkan)
+              </span>
+            </div>
+
+            {/* Hidden File Input */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/png, image/jpeg, image/webp"
+              className="hidden"
+              onChange={(e) => handleHeroImageUpload(e, activeSlideTab)}
+            />
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+              {/* Left/Main: Upload & URL inputs */}
+              <div className="lg:col-span-7 space-y-3">
+                {/* Upload Action Button */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isCompressingImage}
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-xs transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
+                  >
+                    {isCompressingImage ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>Memampatkan Gambar...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-3.5 h-3.5" />
+                        <span>Muat Naik Dari Komputer / Telefon</span>
+                      </>
+                    )}
+                  </button>
+
+                  {currentSlide.imageUrl && (
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveHeroImage(activeSlideTab)}
+                      className="px-3 py-2 bg-white hover:bg-rose-50 text-rose-600 border border-rose-200 hover:border-rose-300 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Padam Gambar</span>
+                    </button>
+                  )}
+                </div>
+
+                {/* Direct URL Input */}
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold text-slate-600 flex items-center gap-1">
+                    <LinkIcon className="w-3 h-3 text-slate-400" />
+                    <span>Atau Masukkan URL Pautan Gambar:</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={currentSlide.imageUrl || ''}
+                    onChange={(e) => handleUpdateSlide(activeSlideTab, 'imageUrl', e.target.value)}
+                    placeholder="https://... (URL pautan gambar)"
+                    className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 font-mono"
+                  />
+                </div>
+
+                {/* Preset Banner Buttons */}
+                <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                  <span className="text-[10px] font-bold text-slate-400">Pilihan Pantas:</span>
+                  <button
+                    type="button"
+                    onClick={() => handleUpdateSlide(activeSlideTab, 'imageUrl', 'https://raw.githubusercontent.com/syncrozz/syncrozz-assets/main/OGI/OGI.Event.v3.jpg')}
+                    className="px-2.5 py-1 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg text-[10px] font-bold transition-colors cursor-pointer"
+                  >
+                    Banner OGI Rasmi
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleUpdateSlide(activeSlideTab, 'imageUrl', 'https://images.unsplash.com/photo-1506784983877-45594efa4cbe?q=80&w=1000&auto=format&fit=crop')}
+                    className="px-2.5 py-1 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg text-[10px] font-bold transition-colors cursor-pointer"
+                  >
+                    Banner Kalendar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleUpdateSlide(activeSlideTab, 'imageUrl', 'https://images.unsplash.com/photo-1511578314322-379afb476865?q=80&w=1000&auto=format&fit=crop')}
+                    className="px-2.5 py-1 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg text-[10px] font-bold transition-colors cursor-pointer"
+                  >
+                    Banner Aktiviti Kampus
+                  </button>
+                </div>
+              </div>
+
+              {/* Right: Live Image Thumbnail Preview */}
+              <div className="lg:col-span-5 flex flex-col items-center justify-center">
+                <div className="relative w-full h-36 sm:h-40 rounded-xl overflow-hidden border-2 border-dashed border-slate-300 bg-slate-100 flex items-center justify-center group shadow-xs">
+                  {currentSlide.imageUrl ? (
+                    <>
+                      <img
+                        src={currentSlide.imageUrl}
+                        alt="Pratonton Gambar Slide"
+                        className="w-full h-full object-cover"
+                        crossOrigin="anonymous"
+                        referrerPolicy="no-referrer"
+                      />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          className="p-2 bg-white/90 text-slate-900 rounded-lg text-xs font-bold shadow-md hover:bg-white transition-transform hover:scale-105"
+                          title="Tukar Gambar"
+                        >
+                          <Upload className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveHeroImage(activeSlideTab)}
+                          className="p-2 bg-rose-600 text-white rounded-lg text-xs font-bold shadow-md hover:bg-rose-700 transition-transform hover:scale-105"
+                          title="Padam Gambar"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                      <span className="absolute bottom-2 right-2 px-2 py-0.5 bg-black/70 text-white text-[9px] font-extrabold rounded backdrop-blur-xs">
+                        Gambar Aktif
+                      </span>
+                    </>
+                  ) : (
+                    <div 
+                      onClick={() => fileInputRef.current?.click()}
+                      className="text-center p-4 cursor-pointer hover:bg-slate-200/50 transition-colors w-full h-full flex flex-col items-center justify-center"
+                    >
+                      <ImageIcon className="w-7 h-7 text-slate-400 mb-1" />
+                      <p className="text-xs font-bold text-slate-700">Tiada gambar dipilih</p>
+                      <p className="text-[10px] text-slate-500">Klik untuk muat naik fail poster</p>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -824,6 +989,38 @@ export const AdminHeroManager: React.FC<AdminHeroManagerProps> = ({
         </div>
 
       </div>
+
+      {/* Floating Save Action Bar when there are unsaved edits */}
+      {isDirty && (
+        <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-40 w-[92%] max-w-xl bg-slate-900/95 backdrop-blur-xl border border-indigo-500/40 text-white px-5 py-3.5 rounded-2xl shadow-2xl flex items-center justify-between gap-4 animate-in slide-in-from-bottom-6">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span className="w-3 h-3 rounded-full bg-amber-400 animate-pulse shrink-0" />
+            <div className="min-w-0">
+              <p className="text-xs font-black text-white truncate">Perubahan Hero Carousel Belum Disimpan</p>
+              <p className="text-[10px] text-slate-300 truncate">Tekan butang simpan untuk kemaskini di homepage & database</p>
+            </div>
+          </div>
+          
+          <button
+            type="button"
+            disabled={isSaving}
+            onClick={handleSave}
+            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black flex items-center gap-2 shadow-lg shadow-indigo-600/30 transition-all active:scale-95 shrink-0 cursor-pointer disabled:opacity-50"
+          >
+            {isSaving ? (
+              <>
+                <Clock className="w-3.5 h-3.5 animate-spin" />
+                <span>Menyimpan...</span>
+              </>
+            ) : (
+              <>
+                <Save className="w-3.5 h-3.5" />
+                <span>Simpan Sekarang</span>
+              </>
+            )}
+          </button>
+        </div>
+      )}
 
     </div>
   );

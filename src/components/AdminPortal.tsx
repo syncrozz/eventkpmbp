@@ -65,6 +65,7 @@ interface AdminPortalProps {
   onBulkImportEvents?: (events: KpmbpEvent[], replaceAll: boolean) => Promise<void>;
   heroConfig?: HeroConfig;
   onSaveHeroConfig?: (config: HeroConfig) => Promise<void> | void;
+  onShowToast?: (msg: string) => void;
 }
 
 export const AdminPortal: React.FC<AdminPortalProps> = ({
@@ -77,7 +78,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   onSeedSampleData,
   onBulkImportEvents,
   heroConfig,
-  onSaveHeroConfig
+  onSaveHeroConfig,
+  onShowToast
 }) => {
   const [activeAdminTab, setActiveAdminTab] = useState<'events' | 'registrations' | 'hero'>('events');
   const [registrations, setRegistrations] = useState<RegistrationRecord[]>([]);
@@ -2189,6 +2191,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
           heroConfig={heroConfig}
           events={events}
           onSaveHeroConfig={onSaveHeroConfig}
+          onShowToast={onShowToast}
         />
       )}
 
