@@ -13,7 +13,7 @@ import { AdminPortal } from './components/AdminPortal';
 import { AdminPinModal } from './components/AdminPinModal';
 import { DeleteConfirmationModal } from './components/DeleteConfirmationModal';
 import { Footer } from './components/Footer';
-import { sortEventsByNearestDue, getCategoryButtonClass, isEventArchived, isOngoingProgram, getDynamicEventStatus } from './utils/calendar';
+import { sortEventsByNearestDue, getCategoryButtonClass, isEventArchived, isOngoingProgram, getDynamicEventStatus, findEventBySlugOrId, getEventSlug } from './utils/calendar';
 import { 
   subscribeToAllEvents,
   createNewEvent,
@@ -125,14 +125,14 @@ export default function App() {
     };
   }, []);
 
-  // Deep-linking hash support: Automatically open Event Detail Modal if URL contains #event-ID
+  // Deep-linking hash support: Automatically open Event Detail Modal if URL contains #event-slug or #event-ID
   useEffect(() => {
     const handleHashCheck = () => {
       const hash = window.location.hash;
       if (hash && hash.startsWith('#event-')) {
         const eventId = hash.replace('#event-', '').trim();
         if (eventId) {
-          const found = events.find((e) => e.id === eventId || e.id.toLowerCase() === eventId.toLowerCase());
+          const found = findEventBySlugOrId(events, eventId);
           if (found) {
             setSelectedEventForDetail(found);
           }
@@ -146,11 +146,12 @@ export default function App() {
     return () => window.removeEventListener('hashchange', handleHashCheck);
   }, [events]);
 
-  // Keep URL hash in sync when modal is opened / closed
+  // Keep URL hash in sync with short slug when modal is opened / closed
   const handleOpenDetailModal = (evt: KpmbpEvent) => {
     setSelectedEventForDetail(evt);
     try {
-      window.history.replaceState(null, '', `#event-${evt.id}`);
+      const slug = getEventSlug(evt);
+      window.history.replaceState(null, '', `#event-${slug}`);
     } catch {}
   };
 

@@ -12,6 +12,8 @@ import {
   getCategoryBadgeClass, 
   getDynamicEventStatus,
   getEventShareText,
+  getEventShareUrl,
+  getEventSlug,
   isOngoingProgram
 } from '../utils/calendar';
 import { 
@@ -23,7 +25,7 @@ import {
   Share2, ExternalLink, Award, PhoneCall, Check, 
   CalendarPlus, MessageCircle, Copy, Globe, Send,
   FileText, Download, Image as ImageIcon, Loader2, AlertCircle, Edit2, Trash2, Settings,
-  Repeat, Layers, Tag, Users, CheckCircle2
+  Repeat, Layers, Tag, Users, CheckCircle2, Link as LinkIcon
 } from 'lucide-react';
 
 interface EventDetailModalProps {
@@ -46,6 +48,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
   onQuickAdminEdit
 }) => {
   const [copied, setCopied] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
   const [isGeneratingOgi, setIsGeneratingOgi] = useState(false);
   const [ogiError, setOgiError] = useState<string | null>(null);
 
@@ -104,11 +107,21 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
     eventStartTimestamp > Date.now();
   const eventStartRemaining = isFutureEvent ? getTimeRemainingFromTimestampMalay(eventStartTimestamp) : null;
 
+  const shortEventUrl = event ? getEventShareUrl(event) : '';
+  const eventSlug = event ? getEventSlug(event) : '';
+
   const handleCopyInfo = () => {
     const fullText = getEventShareText(event);
     navigator.clipboard.writeText(fullText);
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
+  };
+
+  const handleCopyLink = () => {
+    if (!shortEventUrl) return;
+    navigator.clipboard.writeText(shortEventUrl);
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2500);
   };
 
   const handleShareWhatsApp = () => {
@@ -118,7 +131,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
 
   const handleShareTelegram = () => {
     const text = encodeURIComponent(getEventShareText(event));
-    const url = encodeURIComponent(window.location.href.split('#')[0]);
+    const url = encodeURIComponent(shortEventUrl);
     window.open(`https://t.me/share/url?url=${url}&text=${text}`, '_blank');
   };
 
@@ -573,10 +586,31 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
 
           {/* Share Section */}
           <div>
-            <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">
-              Kongsi Program Bersama Rakan KPMBP
-            </h3>
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400">
+                Kongsi Program Bersama Rakan KPMBP
+              </h3>
+              {eventSlug && (
+                <span className="text-[10px] font-mono font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-100/80">
+                  #event-{eventSlug}
+                </span>
+              )}
+            </div>
+            
             <div className="flex flex-wrap gap-2">
+              <button
+                onClick={handleCopyLink}
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all active:scale-95 shadow-2xs cursor-pointer ${
+                  copiedLink
+                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                    : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                }`}
+                title="Salin pautan ringkas acara ini untuk dikongsi (cth: #event-pmk020926)"
+              >
+                {copiedLink ? <Check className="w-4 h-4 text-emerald-700" /> : <LinkIcon className="w-4 h-4" />}
+                <span>{copiedLink ? 'Pautan Disalin!' : 'Salin Pautan Ringkas'}</span>
+              </button>
+
               <button
                 onClick={handleShareWhatsApp}
                 className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-500 text-white text-xs font-bold hover:bg-emerald-600 transition-colors shadow-sm cursor-pointer"

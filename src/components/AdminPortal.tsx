@@ -19,7 +19,7 @@ import {
   getActiveBackendLabel, 
   getActiveBackendType 
 } from '../services/dbAdapter';
-import { formatDateDMY, formatDeadlineMalay, getCategoryBadgeClass, isOngoingProgram } from '../utils/calendar';
+import { formatDateDMY, formatDeadlineMalay, getCategoryBadgeClass, isOngoingProgram, getEventShareUrl, getEventSlug } from '../utils/calendar';
 import { optimizeEventImage } from '../utils/imageOptimizer';
 import { 
   formatMalaysiaWhatsAppNumber, 
@@ -1722,6 +1722,19 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                     )}
                   </td>
                   <td className="py-3 pl-2 text-right whitespace-nowrap space-x-1">
+                    <button
+                      onClick={() => {
+                        const url = getEventShareUrl(evt);
+                        navigator.clipboard.writeText(url);
+                        if (onShowToast) {
+                          onShowToast(`Pautan ringkas disalin: #event-${getEventSlug(evt)}`);
+                        }
+                      }}
+                      className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors"
+                      title={`Salin Pautan Ringkas (#event-${getEventSlug(evt)})`}
+                    >
+                      <LinkIcon className="w-3.5 h-3.5" />
+                    </button>
                     <button
                       onClick={() => handleStartEdit(evt)}
                       className="p-1.5 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors"

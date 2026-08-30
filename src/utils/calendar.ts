@@ -1,4 +1,7 @@
 import { KpmbpEvent, EventStatus } from '../types';
+import { getEventSlug, getEventShareUrl, findEventBySlugOrId, getTitleAcronym, getDateCodeDDMMYY } from './slug';
+
+export { getEventSlug, getEventShareUrl, findEventBySlugOrId, getTitleAcronym, getDateCodeDDMMYY };
 
 /**
  * Checks whether an event is an Ongoing Programme.
@@ -253,7 +256,7 @@ export function buildRegistrationWhatsAppUrl(params: {
 
 export function getEventShareText(event: KpmbpEvent): string {
   const isOngoing = isOngoingProgram(event);
-  const url = typeof window !== 'undefined' ? `${window.location.origin}${window.location.pathname}#event-${event.id}` : '';
+  const url = getEventShareUrl(event);
 
   if (isOngoing) {
     let text = `📌 *${event.title}*\n`;
