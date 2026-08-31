@@ -239,7 +239,8 @@ export const EventCard: React.FC<EventCardProps> = ({
             <img 
               src={event.image} 
               alt={event.title} 
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+              className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-300"
+              style={(event as any).imagePosition ? { objectPosition: (event as any).imagePosition } : undefined}
               onError={(e) => {
                 const parent = (e.target as HTMLElement).parentElement;
                 if (parent) parent.style.display = 'none';

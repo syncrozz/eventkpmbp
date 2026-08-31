@@ -165,7 +165,8 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
             <img 
               src={event.image} 
               alt={event.title} 
-              className="w-full h-full object-cover opacity-60"
+              className="w-full h-full object-cover object-top opacity-60"
+              style={(event as any).imagePosition ? { objectPosition: (event as any).imagePosition } : undefined}
             />
           ) : (
             <div className="w-full h-full bg-gradient-to-br from-indigo-700 via-indigo-800 to-slate-900 opacity-90" />
