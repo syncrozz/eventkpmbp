@@ -502,6 +502,9 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     setFeeType('free');
     setFeeAmount('');
     setTargetAudience('');
+    setTimeout(() => {
+      document.getElementById('admin-event-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
   };
 
   const handleStartEdit = (evt: KpmbpEvent) => {
@@ -536,6 +539,9 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     setFeeType(evt.feeType || 'free');
     setFeeAmount(evt.feeAmount || '');
     setTargetAudience(evt.targetAudience || '');
+    setTimeout(() => {
+      document.getElementById('admin-event-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -817,9 +823,143 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
         )}
       </div>
 
-      {/* Form (Create/Edit) */}
+      {/* Tab 1: Events Table / List */}
+      {activeAdminTab === 'events' && (
+        <div className="bg-white/60 backdrop-blur-xl border border-white/80 rounded-3xl p-6 shadow-sm overflow-x-auto">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+            <h3 className="text-sm font-extrabold text-slate-800">
+              Senarai Acara Terbit ({events.length})
+            </h3>
+          </div>
+
+          <table className="w-full text-left text-xs border-collapse">
+            <thead>
+              <tr className="border-b border-slate-200/80 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
+                <th className="pb-3 pr-2">Tajuk Event</th>
+                <th className="pb-3 px-2">Mod / Tarikh</th>
+                <th className="pb-3 px-2">Kategori</th>
+                <th className="pb-3 px-2">Pendaftaran</th>
+                <th className="pb-3 px-2">Status</th>
+                <th className="pb-3 px-2">Lokasi / Due</th>
+                <th className="pb-3 pl-2 text-right">Tindakan</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 font-medium">
+              {events.map((evt) => (
+                <tr key={evt.id} className="hover:bg-slate-50/80 transition-colors">
+                  <td className="py-3 pr-2 font-bold text-slate-900 max-w-[220px]">
+                    <div className="flex items-center gap-2">
+                      {evt.image ? (
+                        <img
+                          src={evt.image}
+                          alt="Poster"
+                          className="w-8 h-8 object-cover rounded-lg border border-slate-200 shrink-0 bg-slate-100"
+                          onError={(e) => {
+                            (e.target as HTMLElement).style.display = 'none';
+                          }}
+                        />
+                      ) : (
+                        <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-400 flex items-center justify-center shrink-0">
+                          <ImageIcon className="w-4 h-4" />
+                        </div>
+                      )}
+                      <span className="truncate">{evt.title}</span>
+                    </div>
+                  </td>
+                  <td className="py-3 px-2 text-slate-600 whitespace-nowrap">
+                    {isOngoingProgram(evt) ? (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-extrabold px-2 py-0.5 rounded-lg bg-emerald-100/95 text-emerald-950 border border-emerald-300 shadow-2xs">
+                        <Repeat className="w-3 h-3 text-emerald-700" />
+                        <span>Program Berterusan</span>
+                      </span>
+                    ) : (
+                      <div className="flex items-center gap-1.5">
+                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase ${
+                          evt.eventMode === 'online' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700'
+                        }`}>
+                          {evt.eventMode === 'online' ? 'Online' : 'Fizikal'}
+                        </span>
+                        <span className="text-[11px] font-extrabold px-2 py-0.5 rounded-lg bg-amber-100/95 text-amber-950 border border-amber-300 shadow-2xs">
+                          {formatDateDMY(evt.date)}
+                        </span>
+                      </div>
+                    )}
+                  </td>
+                  <td className="py-3 px-2">
+                    <span className={`px-2 py-0.5 rounded-lg text-[10px] font-extrabold uppercase tracking-wider ${getCategoryBadgeClass(evt.category)}`}>
+                      {evt.category}
+                    </span>
+                  </td>
+                  <td className="py-3 px-2">
+                    {evt.registrationMode === 'none' ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-100 text-slate-700 border border-slate-200 rounded text-[10px] font-bold">
+                        <span>Tiada Pendaftaran</span>
+                      </span>
+                    ) : evt.registrationMode === 'admin' ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded text-[10px] font-bold">
+                        <span>WhatsApp Admin</span>
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded text-[10px] font-bold">
+                        <span>Borang Daftar</span>
+                      </span>
+                    )}
+                  </td>
+                  <td className="py-3 px-2">
+                    <span className="px-2 py-0.5 bg-slate-100 text-slate-800 rounded text-[10px] font-bold">
+                      {evt.status}
+                    </span>
+                  </td>
+                  <td className="py-3 px-2 text-slate-600 max-w-[170px] truncate text-[11px]">
+                    {isOngoingProgram(evt) ? (
+                      <span className="text-slate-700 font-semibold truncate block">
+                        {evt.scheduleSummary || evt.location || 'Program Berkala'}
+                      </span>
+                    ) : evt.eventMode === 'online' ? (
+                      <span className="text-amber-700 font-bold">Due: {formatDeadlineMalay(evt.submissionDeadline)}</span>
+                    ) : (
+                      evt.location || '-'
+                    )}
+                  </td>
+                  <td className="py-3 pl-2 text-right whitespace-nowrap space-x-1">
+                    <button
+                      onClick={() => {
+                        const url = getEventShareUrl(evt);
+                        navigator.clipboard.writeText(url);
+                        if (onShowToast) {
+                          onShowToast(`Pautan ringkas disalin: #event-${getEventSlug(evt)}`);
+                        }
+                      }}
+                      className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors"
+                      title={`Salin Pautan Ringkas (#event-${getEventSlug(evt)})`}
+                    >
+                      <LinkIcon className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => handleStartEdit(evt)}
+                      className="p-1.5 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors"
+                      title="Sunting"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => onDeleteEvent(evt)}
+                      className="p-1.5 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors"
+                      title="Padam"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Form (Create/Edit) - Rendered at bottom */}
       {(isCreating || editingEvent) && (
-        <form onSubmit={handleSaveForm} className="bg-white/90 backdrop-blur-xl border border-indigo-200 rounded-3xl p-6 shadow-md space-y-4 animate-in fade-in">
+        <form id="admin-event-form" onSubmit={handleSaveForm} className="bg-white/90 backdrop-blur-xl border border-indigo-200 rounded-3xl p-6 shadow-md space-y-4 animate-in fade-in">
           <div className="flex items-center justify-between border-b border-slate-200 pb-3">
             <div>
               <h3 className="text-base font-extrabold text-slate-900">
@@ -1704,140 +1844,6 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
             </button>
           </div>
         </form>
-      )}
-
-      {/* Tab 1: Events Table / List */}
-      {activeAdminTab === 'events' && (
-        <div className="bg-white/60 backdrop-blur-xl border border-white/80 rounded-3xl p-6 shadow-sm overflow-x-auto">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-            <h3 className="text-sm font-extrabold text-slate-800">
-              Senarai Acara Terbit ({events.length})
-            </h3>
-          </div>
-
-          <table className="w-full text-left text-xs border-collapse">
-            <thead>
-              <tr className="border-b border-slate-200/80 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
-                <th className="pb-3 pr-2">Tajuk Event</th>
-                <th className="pb-3 px-2">Mod / Tarikh</th>
-                <th className="pb-3 px-2">Kategori</th>
-                <th className="pb-3 px-2">Pendaftaran</th>
-                <th className="pb-3 px-2">Status</th>
-                <th className="pb-3 px-2">Lokasi / Due</th>
-                <th className="pb-3 pl-2 text-right">Tindakan</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 font-medium">
-              {events.map((evt) => (
-                <tr key={evt.id} className="hover:bg-slate-50/80 transition-colors">
-                  <td className="py-3 pr-2 font-bold text-slate-900 max-w-[220px]">
-                    <div className="flex items-center gap-2">
-                      {evt.image ? (
-                        <img
-                          src={evt.image}
-                          alt="Poster"
-                          className="w-8 h-8 object-cover rounded-lg border border-slate-200 shrink-0 bg-slate-100"
-                          onError={(e) => {
-                            (e.target as HTMLElement).style.display = 'none';
-                          }}
-                        />
-                      ) : (
-                        <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-400 flex items-center justify-center shrink-0">
-                          <ImageIcon className="w-4 h-4" />
-                        </div>
-                      )}
-                      <span className="truncate">{evt.title}</span>
-                    </div>
-                  </td>
-                  <td className="py-3 px-2 text-slate-600 whitespace-nowrap">
-                    {isOngoingProgram(evt) ? (
-                      <span className="inline-flex items-center gap-1 text-[11px] font-extrabold px-2 py-0.5 rounded-lg bg-emerald-100/95 text-emerald-950 border border-emerald-300 shadow-2xs">
-                        <Repeat className="w-3 h-3 text-emerald-700" />
-                        <span>Program Berterusan</span>
-                      </span>
-                    ) : (
-                      <div className="flex items-center gap-1.5">
-                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase ${
-                          evt.eventMode === 'online' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700'
-                        }`}>
-                          {evt.eventMode === 'online' ? 'Online' : 'Fizikal'}
-                        </span>
-                        <span className="text-[11px] font-extrabold px-2 py-0.5 rounded-lg bg-amber-100/95 text-amber-950 border border-amber-300 shadow-2xs">
-                          {formatDateDMY(evt.date)}
-                        </span>
-                      </div>
-                    )}
-                  </td>
-                  <td className="py-3 px-2">
-                    <span className={`px-2 py-0.5 rounded-lg text-[10px] font-extrabold uppercase tracking-wider ${getCategoryBadgeClass(evt.category)}`}>
-                      {evt.category}
-                    </span>
-                  </td>
-                  <td className="py-3 px-2">
-                    {evt.registrationMode === 'none' ? (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-100 text-slate-700 border border-slate-200 rounded text-[10px] font-bold">
-                        <span>Tiada Pendaftaran</span>
-                      </span>
-                    ) : evt.registrationMode === 'admin' ? (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded text-[10px] font-bold">
-                        <span>WhatsApp Admin</span>
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded text-[10px] font-bold">
-                        <span>Borang Daftar</span>
-                      </span>
-                    )}
-                  </td>
-                  <td className="py-3 px-2">
-                    <span className="px-2 py-0.5 bg-slate-100 text-slate-800 rounded text-[10px] font-bold">
-                      {evt.status}
-                    </span>
-                  </td>
-                  <td className="py-3 px-2 text-slate-600 max-w-[170px] truncate text-[11px]">
-                    {isOngoingProgram(evt) ? (
-                      <span className="text-slate-700 font-semibold truncate block">
-                        {evt.scheduleSummary || evt.location || 'Program Berkala'}
-                      </span>
-                    ) : evt.eventMode === 'online' ? (
-                      <span className="text-amber-700 font-bold">Due: {formatDeadlineMalay(evt.submissionDeadline)}</span>
-                    ) : (
-                      evt.location || '-'
-                    )}
-                  </td>
-                  <td className="py-3 pl-2 text-right whitespace-nowrap space-x-1">
-                    <button
-                      onClick={() => {
-                        const url = getEventShareUrl(evt);
-                        navigator.clipboard.writeText(url);
-                        if (onShowToast) {
-                          onShowToast(`Pautan ringkas disalin: #event-${getEventSlug(evt)}`);
-                        }
-                      }}
-                      className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors"
-                      title={`Salin Pautan Ringkas (#event-${getEventSlug(evt)})`}
-                    >
-                      <LinkIcon className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={() => handleStartEdit(evt)}
-                      className="p-1.5 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors"
-                      title="Sunting"
-                    >
-                      <Edit2 className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={() => onDeleteEvent(evt)}
-                      className="p-1.5 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors"
-                      title="Padam"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
       )}
 
       {/* Tab 2: Registrations Table (From Firestore Cloud) */}
