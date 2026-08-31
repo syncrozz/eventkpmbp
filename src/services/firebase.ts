@@ -183,10 +183,24 @@ export function subscribeToEvents(
   try {
     unsubscribe = onSnapshot(
       eventsRef,
-      (snapshot) => {
+      async (snapshot) => {
         if (snapshot.empty) {
-          onUpdate([]);
-          saveLocalEventsCache([]);
+          // If Firestore is empty (e.g. initial setup), auto-seed INITIAL_EVENTS so all devices have events
+          const initialList = cachedEvents && cachedEvents.length > 0 ? cachedEvents : INITIAL_EVENTS;
+          try {
+            for (const evt of initialList) {
+              const docRef = doc(db, EVENTS_COLLECTION, evt.id);
+              await setDoc(docRef, sanitizeForFirestore({
+                ...evt,
+                createdAt: evt.createdAt || new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+              }));
+            }
+          } catch (seedErr) {
+            console.warn('Initial seed notice:', seedErr);
+          }
+          onUpdate(initialList);
+          saveLocalEventsCache(initialList);
           return;
         }
 
@@ -310,6 +324,64 @@ export async function deleteEventInFirestore(eventId: string): Promise<void> {
   } catch (error) {
     console.error('Error in deleteEventInFirestore:', error);
     throw error;
+  }
+}
+
+/**
+ * Bulk syncs all local events to Firestore Cloud, reporting detailed success/failure.
+ */
+export async function syncAllEventsToFirestore(
+  eventsList: KpmbpEvent[]
+): Promise<{ success: boolean; syncedCount: number; errors: string[] }> {
+  const errors: string[] = [];
+  let syncedCount = 0;
+
+  for (const evt of eventsList) {
+    try {
+      const docRef = doc(db, EVENTS_COLLECTION, evt.id);
+      const payload = sanitizeForFirestore({
+        ...evt,
+        updatedAt: new Date().toISOString()
+      });
+      await setDoc(docRef, payload);
+      syncedCount++;
+    } catch (err: any) {
+      console.error(`Failed to sync event ${evt.title} (${evt.id}):`, err);
+      errors.push(`${evt.title}: ${err?.message || 'Ralat simpanan'}`);
+    }
+  }
+
+  return {
+    success: errors.length === 0,
+    syncedCount,
+    errors
+  };
+}
+
+/**
+ * Checks live connection and health of Firebase Firestore database.
+ */
+export async function checkFirestoreHealth(): Promise<{
+  connected: boolean;
+  message: string;
+  cloudCount?: number;
+  databaseId?: string;
+}> {
+  try {
+    const eventsRef = collection(db, EVENTS_COLLECTION);
+    const snapshot = await getDocs(eventsRef);
+    return {
+      connected: true,
+      message: 'Firestore bersambung dengan sempurna (Online).',
+      cloudCount: snapshot.size,
+      databaseId: designatedDbId || '(default)'
+    };
+  } catch (err: any) {
+    return {
+      connected: false,
+      message: `Ralat Firestore: ${err?.message || 'Tidak dapat menghubungi pangkalan data'}`,
+      databaseId: designatedDbId || '(default)'
+    };
   }
 }
 

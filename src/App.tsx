@@ -368,10 +368,12 @@ export default function App() {
     try {
       const newId = await createNewEvent(newEventData);
       createdEvent = { ...newEventData, id: newId };
+      showToast(`Acara "${newEventData.title}" berjaya diterbitkan & disegerak ke Cloud!`);
     } catch (err: any) {
       console.warn('Saving event locally (Cloud notice):', err?.message);
       const tempId = `kpmbp-evt-${Date.now()}`;
       createdEvent = { ...newEventData, id: tempId };
+      showToast(`⚠️ Acara disimpan secara lokal (Ralat Cloud: ${err?.message || 'Gagal ke Firestore'})`);
     }
 
     setEvents((prev) => {
@@ -379,7 +381,6 @@ export default function App() {
       try { localStorage.setItem('kpmbp_events_v2', JSON.stringify(next)); } catch {}
       return next;
     });
-    showToast(`Acara "${newEventData.title}" berjaya diterbitkan & disimpan!`);
   };
 
   const handleUpdateEvent = async (updated: KpmbpEvent) => {
@@ -396,10 +397,11 @@ export default function App() {
 
     try {
       await updateExistingEvent(updated);
+      showToast(`Maklumat "${updated.title}" telah berjaya dikemaskini & disegerak ke Cloud!`);
     } catch (err: any) {
       console.warn('Notice: Update stored locally (Cloud notice):', err?.message);
+      showToast(`⚠️ Disimpan pada peranti ini sahaja (Ralat Cloud: ${err?.message || 'Gagal ke Firestore'})`);
     }
-    showToast(`Maklumat "${updated.title}" telah berjaya dikemaskini!`);
   };
 
   const handleRequestDelete = (target: KpmbpEvent | string) => {
@@ -430,11 +432,12 @@ export default function App() {
 
     try {
       await deleteExistingEvent(targetId);
+      showToast(`Acara "${targetTitle}" telah berjaya dipadam dari Cloud.`);
     } catch (err: any) {
       console.warn('Notice: Deleted from local storage (Cloud notice):', err?.message);
+      showToast(`⚠️ Acara dipadam secara lokal sahaja (Ralat Cloud: ${err?.message || 'Gagal segerak'})`);
     } finally {
       setIsDeletingEvent(false);
-      showToast(`Acara "${targetTitle}" telah berjaya dipadam.`);
     }
   };
 

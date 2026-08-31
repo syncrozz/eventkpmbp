@@ -4,6 +4,8 @@ import {
   createEventInFirestore,
   updateEventInFirestore,
   deleteEventInFirestore,
+  syncAllEventsToFirestore,
+  checkFirestoreHealth,
   saveRegistrationToFirestore,
   subscribeToRegistrations as subscribeToFirestoreRegistrations,
   deleteRegistrationFromFirestore,
@@ -24,6 +26,8 @@ import {
   saveLocalSubmissionsCache,
   db
 } from './firebase';
+
+export { syncAllEventsToFirestore, checkFirestoreHealth };
 import { INITIAL_EVENTS } from '../data/initialEvents';
 
 export type BackendType = 'firebase' | 'local';

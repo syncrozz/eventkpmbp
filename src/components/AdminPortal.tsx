@@ -23,6 +23,8 @@ import {
   updateExistingSubmission,
   rejectEventSubmission,
   approveEventSubmission,
+  syncAllEventsToFirestore,
+  checkFirestoreHealth,
   getActiveBackendLabel, 
   getActiveBackendType 
 } from '../services/dbAdapter';
@@ -141,7 +143,33 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const [importFileName, setImportFileName] = useState('');
   const [importMode, setImportMode] = useState<'merge' | 'replace'>('merge');
   const [isImporting, setIsImporting] = useState(false);
+  const [isSyncingCloud, setIsSyncingCloud] = useState(false);
   const csvFileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleSyncToCloud = async () => {
+    if (events.length === 0) {
+      alert('Tiada acara untuk disegerakkan.');
+      return;
+    }
+    setIsSyncingCloud(true);
+    try {
+      const result = await syncAllEventsToFirestore(events);
+      const health = await checkFirestoreHealth();
+      if (result.success) {
+        if (onShowToast) {
+          onShowToast(`✅ Berjaya segerak ${result.syncedCount} acara ke Firebase Firestore Cloud!`);
+        } else {
+          alert(`✅ Berjaya segerak ${result.syncedCount} acara ke Firebase Firestore Cloud!\n\nPangkalan data: ${health.databaseId}\nStatus: Online`);
+        }
+      } else {
+        alert(`⚠️ Sebahagian acara gagal disegerak:\n${result.errors.join('\n')}`);
+      }
+    } catch (err: any) {
+      alert(`❌ Ralat penyegerakan Cloud: ${err?.message || 'Tidak dapat berhubung dengan Firebase'}`);
+    } finally {
+      setIsSyncingCloud(false);
+    }
+  };
 
   const handleExportEventsCSV = () => {
     if (events.length === 0) {
@@ -752,6 +780,27 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
               className="hidden"
               onChange={handleCsvFileSelect}
             />
+
+            {/* Sync Cloud Firestore Button */}
+            <button
+              id="admin-btn-sync-cloud"
+              type="button"
+              onClick={handleSyncToCloud}
+              disabled={isSyncingCloud}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all border cursor-pointer shadow-2xs ${
+                isSyncingCloud 
+                  ? 'bg-blue-100 text-blue-800 border-blue-300 animate-pulse cursor-wait'
+                  : 'bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200/80 hover:border-blue-300'
+              }`}
+              title="Segerakkan semua acara ke Firebase Firestore Cloud supaya muncul serta-merta di semua peranti lain"
+            >
+              {isSyncingCloud ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600" />
+              ) : (
+                <Cloud className="w-3.5 h-3.5 text-blue-600" />
+              )}
+              <span>{isSyncingCloud ? 'Syncing...' : 'Sync'}</span>
+            </button>
 
             {/* Eksport Pendaftaran */}
             <button
