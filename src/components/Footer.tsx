@@ -32,24 +32,43 @@ export const Footer: React.FC<FooterProps> = ({
         {/* Separator (Desktop) */}
         <span className="hidden sm:inline text-slate-300 font-light select-none">|</span>
 
-        {/* PLATFORM BRANDING & DEVELOP BY SYNCROZZ (RIGHT) */}
-        <div className="flex items-center justify-center gap-2">
+        {/* PLATFORM BRANDING & DEVELOPED BY SYNCROZZ (RIGHT) */}
+        <div className="flex items-center justify-center gap-2 flex-wrap sm:flex-nowrap">
           {logoUrl && (
             <img 
               src={logoUrl} 
               alt={`${platformName} Logo`} 
-              className="w-5 h-5 object-contain rounded"
+              referrerPolicy="no-referrer"
+              className="w-5 h-5 object-contain rounded shrink-0"
             />
           )}
-          <span>
-            © {year} {platformName} · Develop By{' '}
-            <a 
-              href="https://wasap.my/60145313756" 
-              target="_blank" 
+          <span className="inline-flex items-center gap-1.5 flex-wrap justify-center">
+            <span>
+              © {year} {platformName} · Developed by{' '}
+              <a 
+                href="https://syncrozz.com" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="font-black text-indigo-600 hover:text-indigo-800 underline transition-colors"
+              >
+                Syncrozz
+              </a>
+            </span>
+            <a
+              id="footer-whatsapp-shortcut"
+              href="https://wa.me/6145313756"
+              target="_blank"
               rel="noopener noreferrer"
-              className="font-black text-indigo-600 hover:text-indigo-800 underline transition-colors"
+              className="inline-flex items-center justify-center transition-all duration-200 hover:scale-110 active:scale-95 opacity-90 hover:opacity-100 shrink-0"
+              title="Hubungi Syncrozz di WhatsApp"
+              aria-label="Hubungi Syncrozz di WhatsApp"
             >
-              Syncrozz
+              <img
+                src="https://raw.githubusercontent.com/syncrozz/syncrozz-assets/main/logo/MAIN/Logo%20Whatapp%20v2.png"
+                alt="WhatsApp Syncrozz"
+                referrerPolicy="no-referrer"
+                className="w-5 h-5 object-contain"
+              />
             </a>
           </span>
         </div>
