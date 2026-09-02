@@ -347,10 +347,22 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                   <span>{currentSlide.badgeText || 'Pusat Maklumat Rasmi KPMBP'}</span>
                 </div>
 
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-100 text-emerald-700 text-xs font-bold">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
-                  <span>{openCount} Acara Dibuka</span>
-                </div>
+                {openCount > 0 ? (
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-100 text-emerald-700 text-xs font-bold">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+                    <span>{openCount} Acara Dibuka</span>
+                  </div>
+                ) : events.length > 0 ? (
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 border border-slate-200 text-slate-700 text-xs font-bold">
+                    <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                    <span>{events.length} Acara Diterbitkan</span>
+                  </div>
+                ) : (
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-100 text-indigo-700 text-xs font-bold">
+                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                    <span>Pusat Maklumat KPMBP</span>
+                  </div>
+                )}
 
                 {currentSlide.subtitle && (
                   <span className="text-[11px] font-semibold text-slate-400 hidden sm:inline-block">

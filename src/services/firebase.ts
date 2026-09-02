@@ -28,12 +28,11 @@ const designatedDbId = firebaseConfig.firestoreDatabaseId && firebaseConfig.fire
   ? firebaseConfig.firestoreDatabaseId
   : undefined;
 
-// Initialize primary and fallback instances with ignoreUndefinedProperties & forced long polling
+// Initialize primary Firestore instance with clean standard settings
 let primaryDb;
 try {
   primaryDb = initializeFirestore(app, {
     ignoreUndefinedProperties: true,
-    experimentalForceLongPolling: true,
   }, designatedDbId);
 } catch {
   primaryDb = designatedDbId ? getFirestore(app, designatedDbId) : getFirestore(app);
@@ -123,88 +122,102 @@ function toFirestoreDocPayload(obj: any): any {
   return { fields };
 }
 
+// In-flight REST query deduplication promise
+let pendingEventsFetchPromise: Promise<KpmbpEvent[]> | null = null;
+
 /**
  * Direct REST query for all events directly from Firestore (100% resilient across incognito & private modes).
+ * Deduplicates concurrent in-flight requests to prevent duplicate network traffic.
  */
 export async function fetchEventsDirectFromRest(): Promise<KpmbpEvent[]> {
-  try {
-    const projectId = firebaseConfig.projectId;
-    const dbId = designatedDbId || '(default)';
-    const apiKey = firebaseConfig.apiKey;
-    const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${dbId}/documents:runQuery?key=${apiKey}`;
+  if (pendingEventsFetchPromise) {
+    return pendingEventsFetchPromise;
+  }
 
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        structuredQuery: {
-          from: [{ collectionId: EVENTS_COLLECTION }]
-        }
-      })
-    });
+  pendingEventsFetchPromise = (async () => {
+    try {
+      const projectId = firebaseConfig.projectId;
+      const dbId = designatedDbId || '(default)';
+      const apiKey = firebaseConfig.apiKey;
+      const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${dbId}/documents:runQuery?key=${apiKey}`;
 
-    if (!res.ok) {
-      throw new Error(`REST query failed: ${res.status} ${res.statusText}`);
-    }
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          structuredQuery: {
+            from: [{ collectionId: EVENTS_COLLECTION }]
+          }
+        })
+      });
 
-    const data = await res.json();
-    const eventsList: KpmbpEvent[] = [];
+      if (!res.ok) {
+        throw new Error(`REST query failed: ${res.status} ${res.statusText}`);
+      }
 
-    if (Array.isArray(data)) {
-      for (const item of data) {
-        if (item.document) {
-          const raw = parseFirestoreDoc(item.document);
-          if (raw && raw.id && raw.title) {
-            eventsList.push({
-              id: raw.id,
-              eventType: raw.eventType || 'ONE_TIME_EVENT',
-              title: raw.title || '',
-              description: raw.description || '',
-              category: raw.category || 'Akademik',
-              date: raw.date || '',
-              startTime: raw.startTime || '',
-              endTime: raw.endTime || '',
-              location: raw.location || '',
-              organiser: raw.organiser || 'KPMBP',
-              image: raw.image || undefined,
-              eventMode: raw.eventMode || 'physical',
-              registrationMode: raw.registrationMode || (raw.registrationUrl ? 'google_form' : (raw.organiserWhatsApp ? 'admin' : 'none')),
-              organiserWhatsApp: raw.organiserWhatsApp || undefined,
-              submissionDeadline: raw.submissionDeadline || undefined,
-              registrationUrl: raw.registrationUrl || undefined,
-              registrationDeadline: raw.registrationDeadline || undefined,
-              status: raw.status || 'Registration Open',
-              eligibility: raw.eligibility || 'Terbuka kepada semua siswa & siswi KPMBP',
-              contact: raw.contact || 'Urusetia KPMBP',
-              featured: Boolean(raw.featured),
-              importantNotice: raw.importantNotice || undefined,
-              seatsLeft: typeof raw.seatsLeft === 'number' ? raw.seatsLeft : undefined,
-              totalSeats: typeof raw.totalSeats === 'number' ? raw.totalSeats : undefined,
-              tags: Array.isArray(raw.tags) ? raw.tags : [],
-              programDuration: raw.programDuration || undefined,
-              scheduleSummary: raw.scheduleSummary || undefined,
-              scheduleSessions: Array.isArray(raw.scheduleSessions) ? raw.scheduleSessions : undefined,
-              feeType: raw.feeType || undefined,
-              feeAmount: raw.feeAmount || undefined,
-              targetAudience: raw.targetAudience || undefined,
-              createdAt: raw.createdAt || undefined,
-              updatedAt: raw.updatedAt || undefined
-            });
+      const data = await res.json();
+      const eventsList: KpmbpEvent[] = [];
+
+      if (Array.isArray(data)) {
+        for (const item of data) {
+          if (item.document) {
+            const raw = parseFirestoreDoc(item.document);
+            if (raw && raw.id && raw.title) {
+              eventsList.push({
+                id: raw.id,
+                eventType: raw.eventType || 'ONE_TIME_EVENT',
+                title: raw.title || '',
+                description: raw.description || '',
+                category: raw.category || 'Akademik',
+                date: raw.date || '',
+                startTime: raw.startTime || '',
+                endTime: raw.endTime || '',
+                location: raw.location || '',
+                organiser: raw.organiser || 'KPMBP',
+                image: raw.image || undefined,
+                eventMode: raw.eventMode || 'physical',
+                registrationMode: raw.registrationMode || (raw.registrationUrl ? 'google_form' : (raw.organiserWhatsApp ? 'admin' : 'none')),
+                organiserWhatsApp: raw.organiserWhatsApp || undefined,
+                submissionDeadline: raw.submissionDeadline || undefined,
+                registrationUrl: raw.registrationUrl || undefined,
+                registrationDeadline: raw.registrationDeadline || undefined,
+                status: raw.status || 'Registration Open',
+                eligibility: raw.eligibility || 'Terbuka kepada semua siswa & siswi KPMBP',
+                contact: raw.contact || 'Urusetia KPMBP',
+                featured: Boolean(raw.featured),
+                importantNotice: raw.importantNotice || undefined,
+                seatsLeft: typeof raw.seatsLeft === 'number' ? raw.seatsLeft : undefined,
+                totalSeats: typeof raw.totalSeats === 'number' ? raw.totalSeats : undefined,
+                tags: Array.isArray(raw.tags) ? raw.tags : [],
+                programDuration: raw.programDuration || undefined,
+                scheduleSummary: raw.scheduleSummary || undefined,
+                scheduleSessions: Array.isArray(raw.scheduleSessions) ? raw.scheduleSessions : undefined,
+                feeType: raw.feeType || undefined,
+                feeAmount: raw.feeAmount || undefined,
+                targetAudience: raw.targetAudience || undefined,
+                createdAt: raw.createdAt || undefined,
+                updatedAt: raw.updatedAt || undefined
+              });
+            }
           }
         }
       }
-    }
 
-    if (eventsList.length > 0) {
-      const sorted = sortEventsByNearestDue(eventsList);
-      saveLocalEventsCache(sorted);
-      return sorted;
+      if (eventsList.length > 0) {
+        const sorted = sortEventsByNearestDue(eventsList);
+        saveLocalEventsCache(sorted);
+        return sorted;
+      }
+      return getLocalEventsCache();
+    } catch (err: any) {
+      console.warn('REST events direct fetch notice:', err?.message);
+      return getLocalEventsCache();
+    } finally {
+      pendingEventsFetchPromise = null;
     }
-    return [];
-  } catch (err: any) {
-    console.warn('REST events direct fetch notice:', err?.message);
-    return [];
-  }
+  })();
+
+  return pendingEventsFetchPromise;
 }
 
 /**
@@ -329,7 +342,7 @@ export function getLocalEventsCache(): KpmbpEvent[] {
     const raw = localStorage.getItem('kpmbp_events_v2');
     if (raw !== null) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
+      if (Array.isArray(parsed) && parsed.length > 0) {
         return parsed;
       }
     }
@@ -341,7 +354,9 @@ export function getLocalEventsCache(): KpmbpEvent[] {
 export function saveLocalEventsCache(events: KpmbpEvent[]): void {
   if (typeof window === 'undefined') return;
   try {
-    localStorage.setItem('kpmbp_events_v2', JSON.stringify(events));
+    if (Array.isArray(events)) {
+      localStorage.setItem('kpmbp_events_v2', JSON.stringify(events));
+    }
   } catch {}
 }
 
@@ -393,8 +408,7 @@ export function saveLocalSubmissionsCache(submissions: EventSubmission[]): void 
 
 /**
  * Subscribes to real-time events updates in Firestore with automatic offline/quota fallback.
- * Also immediately triggers a direct resilient REST fetch so incognito windows and fresh devices
- * populate all live cloud events within ~200ms.
+ * Uses a single real-time channel with immediate local cache hydration.
  */
 export function subscribeToEvents(
   onUpdate: (events: KpmbpEvent[]) => void,
@@ -406,37 +420,17 @@ export function subscribeToEvents(
     onUpdate(cachedEvents);
   }
 
-  // 2. Resilient immediate direct cloud fetch (critical for Incognito / new devices)
-  fetchEventsDirectFromRest().then((directEvents) => {
-    if (directEvents && directEvents.length > 0) {
-      onUpdate(directEvents);
-    }
-  }).catch(() => {});
-
-  // 3. Real-time onSnapshot listener for instant cross-device updates
+  // 2. Real-time onSnapshot listener
   const eventsRef = collection(db, EVENTS_COLLECTION);
   let unsubscribe: (() => void) | null = null;
   try {
     unsubscribe = onSnapshot(
       eventsRef,
-      async (snapshot) => {
+      (snapshot) => {
         if (snapshot.empty) {
-          // If Firestore is empty (e.g. initial setup), auto-seed INITIAL_EVENTS
-          const initialList = cachedEvents && cachedEvents.length > 0 ? cachedEvents : INITIAL_EVENTS;
-          try {
-            for (const evt of initialList) {
-              const docRef = doc(db, EVENTS_COLLECTION, evt.id);
-              await setDoc(docRef, sanitizeForFirestore({
-                ...evt,
-                createdAt: evt.createdAt || new Date().toISOString(),
-                updatedAt: new Date().toISOString()
-              }));
-            }
-          } catch (seedErr) {
-            console.warn('Initial seed notice:', seedErr);
-          }
-          onUpdate(initialList);
-          saveLocalEventsCache(initialList);
+          // Firestore is authoritative: empty collection means 0 events (deleted/empty means empty)
+          saveLocalEventsCache([]);
+          onUpdate([]);
           return;
         }
 
@@ -485,26 +479,14 @@ export function subscribeToEvents(
         onUpdate(sortedEvents);
       },
       (err) => {
-        console.warn('Firestore sync notice (using resilient fetch fallback):', err.message);
-        fetchEventsDirectFromRest().then((resEvents) => {
-          if (resEvents.length > 0) {
-            onUpdate(resEvents);
-          } else {
-            onUpdate(getLocalEventsCache());
-          }
-        });
+        console.warn('Firestore sync notice (serving cached data):', err.message);
+        onUpdate(getLocalEventsCache());
         if (onError) onError(err);
       }
     );
   } catch (err: any) {
     console.warn('Firestore subscription unavailable:', err?.message);
-    fetchEventsDirectFromRest().then((resEvents) => {
-      if (resEvents.length > 0) {
-        onUpdate(resEvents);
-      } else {
-        onUpdate(getLocalEventsCache());
-      }
-    });
+    onUpdate(getLocalEventsCache());
     if (onError) onError(err);
   }
 
@@ -700,45 +682,6 @@ export function subscribeToRegistrations(
     onUpdate(cached);
   }
 
-  // Direct REST fetch fallback
-  const projectId = firebaseConfig.projectId;
-  const dbId = designatedDbId || '(default)';
-  const apiKey = firebaseConfig.apiKey;
-  fetch(`https://firestore.googleapis.com/v1/projects/${projectId}/databases/${dbId}/documents:runQuery?key=${apiKey}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ structuredQuery: { from: [{ collectionId: REGISTRATIONS_COLLECTION }] } })
-  }).then(async (res) => {
-    if (res.ok) {
-      const data = await res.json();
-      if (Array.isArray(data)) {
-        const list: RegistrationRecord[] = [];
-        for (const item of data) {
-          if (item.document) {
-            const raw = parseFirestoreDoc(item.document);
-            if (raw && raw.id) {
-              list.push({
-                id: raw.id,
-                eventId: raw.eventId || '',
-                eventTitle: raw.eventTitle || '',
-                studentName: raw.studentName || '',
-                studentId: raw.studentId || '',
-                email: raw.email || '',
-                phone: raw.phone || '',
-                programCode: raw.programCode || '',
-                timestamp: raw.timestamp || ''
-              });
-            }
-          }
-        }
-        if (list.length > 0) {
-          saveLocalRegistrationsCache(list);
-          onUpdate(list);
-        }
-      }
-    }
-  }).catch(() => {});
-
   const regRef = collection(db, REGISTRATIONS_COLLECTION);
   let unsubscribe: (() => void) | null = null;
   
@@ -838,13 +781,6 @@ export function subscribeToHeroConfig(
   const cached = getLocalHeroConfigCache();
   onUpdate(cached);
 
-  // Immediate REST fetch for incognito / fresh devices
-  fetchHeroConfigDirectFromRest().then((resConfig) => {
-    if (resConfig) {
-      onUpdate(resConfig);
-    }
-  }).catch(() => {});
-
   const docRef = doc(db, SETTINGS_COLLECTION, HERO_CONFIG_DOC_ID);
   let unsubscribe: (() => void) | null = null;
 
@@ -868,20 +804,14 @@ export function subscribeToHeroConfig(
         onUpdate(getLocalHeroConfigCache());
       },
       (err) => {
-        console.warn('Hero config sync notice (using fallback):', err.message);
-        fetchHeroConfigDirectFromRest().then((cfg) => {
-          if (cfg) onUpdate(cfg);
-          else onUpdate(getLocalHeroConfigCache());
-        });
+        console.warn('Hero config sync notice (using cached fallback):', err.message);
+        onUpdate(getLocalHeroConfigCache());
         if (onError) onError(err);
       }
     );
   } catch (err: any) {
     console.warn('Hero config subscription unavailable:', err?.message);
-    fetchHeroConfigDirectFromRest().then((cfg) => {
-      if (cfg) onUpdate(cfg);
-      else onUpdate(getLocalHeroConfigCache());
-    });
+    onUpdate(getLocalHeroConfigCache());
     if (onError) onError(err);
   }
 
@@ -969,81 +899,6 @@ export function subscribeToSubmissions(
   if (cached.length > 0) {
     onUpdate(cached);
   }
-
-  // Direct REST fetch
-  const projectId = firebaseConfig.projectId;
-  const dbId = designatedDbId || '(default)';
-  const apiKey = firebaseConfig.apiKey;
-  fetch(`https://firestore.googleapis.com/v1/projects/${projectId}/databases/${dbId}/documents:runQuery?key=${apiKey}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ structuredQuery: { from: [{ collectionId: SUBMISSIONS_COLLECTION }] } })
-  }).then(async (res) => {
-    if (res.ok) {
-      const data = await res.json();
-      if (Array.isArray(data)) {
-        const list: EventSubmission[] = [];
-        for (const item of data) {
-          if (item.document) {
-            const raw = parseFirestoreDoc(item.document);
-            if (raw && raw.id && raw.title) {
-              list.push({
-                id: raw.id,
-                status: raw.status || 'PENDING',
-                submittedAt: raw.submittedAt || new Date().toISOString(),
-                reviewedAt: raw.reviewedAt || undefined,
-                reviewedBy: raw.reviewedBy || undefined,
-                rejectionReason: raw.rejectionReason || undefined,
-                approvedEventId: raw.approvedEventId || undefined,
-                submitterName: raw.submitterName || '',
-                submitterPhone: raw.submitterPhone || '',
-                submitterEmail: raw.submitterEmail || undefined,
-                submitterRole: raw.submitterRole || undefined,
-                eventType: raw.eventType || 'ONE_TIME_EVENT',
-                title: raw.title || '',
-                description: raw.description || '',
-                category: raw.category || 'Pertandingan',
-                date: raw.date || '',
-                startTime: raw.startTime || '',
-                endTime: raw.endTime || '',
-                location: raw.location || '',
-                organiser: raw.organiser || '',
-                image: raw.image || undefined,
-                eventMode: raw.eventMode || 'physical',
-                registrationMode: raw.registrationMode || 'none',
-                organiserWhatsApp: raw.organiserWhatsApp || undefined,
-                organiserUrl: raw.organiserUrl || undefined,
-                submissionDeadline: raw.submissionDeadline || undefined,
-                registrationUrl: raw.registrationUrl || undefined,
-                registrationDeadline: raw.registrationDeadline || undefined,
-                eligibility: raw.eligibility || undefined,
-                contact: raw.contact || undefined,
-                importantNotice: raw.importantNotice || undefined,
-                seatsLeft: typeof raw.seatsLeft === 'number' ? raw.seatsLeft : undefined,
-                totalSeats: typeof raw.totalSeats === 'number' ? raw.totalSeats : undefined,
-                tags: Array.isArray(raw.tags) ? raw.tags : [],
-                scheduleSummary: raw.scheduleSummary || undefined,
-                scheduleSessions: Array.isArray(raw.scheduleSessions) ? raw.scheduleSessions : undefined,
-                programDuration: raw.programDuration || undefined,
-                feeType: raw.feeType || undefined,
-                feeAmount: raw.feeAmount || undefined,
-                targetAudience: raw.targetAudience || undefined
-              });
-            }
-          }
-        }
-        list.sort((a, b) => {
-          if (a.status === 'PENDING' && b.status !== 'PENDING') return -1;
-          if (a.status !== 'PENDING' && b.status === 'PENDING') return 1;
-          return new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime();
-        });
-        if (list.length > 0) {
-          saveLocalSubmissionsCache(list);
-          onUpdate(list);
-        }
-      }
-    }
-  }).catch(() => {});
 
   const subRef = collection(db, SUBMISSIONS_COLLECTION);
   let unsubscribe: (() => void) | null = null;

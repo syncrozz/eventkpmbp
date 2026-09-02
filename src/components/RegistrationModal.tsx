@@ -272,12 +272,9 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
               
               {/* Field 1: Nama Penuh (Auto UPPERCASE & Clean Spaces) */}
               <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-xs font-bold text-slate-700">
-                    Nama Penuh Peserta <span className="text-rose-500">*</span>
-                  </label>
-                  <span className="text-[10px] text-slate-400 font-medium">Auto-UPPERCASE</span>
-                </div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Nama Penuh Peserta <span className="text-rose-500">*</span>
+                </label>
                 <div className="relative">
                   <input
                     type="text"
@@ -305,12 +302,9 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
               {/* Field 2 & 3: No. Matrik (Masked XXX-XXXX-XXX) & Program */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="block text-xs font-bold text-slate-700">
-                      No. Matrik / ID <span className="text-rose-500">*</span>
-                    </label>
-                    <span className="text-[10px] text-indigo-600 font-mono font-bold">XXX-XXXX-XXX</span>
-                  </div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    No. Matrik / ID <span className="text-rose-500">*</span>
+                  </label>
                   <input
                     type="text"
                     required
@@ -325,13 +319,11 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
                         : 'border-slate-200 focus:ring-2 focus:ring-indigo-500/20'
                     }`}
                   />
-                  {formErrors.studentId ? (
+                  {formErrors.studentId && (
                     <p className="text-[11px] text-rose-600 font-bold mt-1 flex items-center gap-1">
                       <AlertCircle className="w-3 h-3 shrink-0" />
                       <span>{formErrors.studentId}</span>
                     </p>
-                  ) : (
-                    <span className="text-[10px] text-slate-400 block mt-0.5">Taip digit sahaja (Auto formatting)</span>
                   )}
                 </div>
 
@@ -355,10 +347,10 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
                 </div>
               </div>
 
-              {/* Field 4: Emel Siswa */}
+              {/* Field 4: Gmail */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Emel Siswa / Rasmi <span className="text-rose-500">*</span>
+                  Gmail <span className="text-rose-500">*</span>
                 </label>
                 <div className="relative">
                   <input
@@ -367,7 +359,7 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
                     value={email}
                     onChange={handleEmailChange}
                     onBlur={() => setEmail(normalizeEmail(email))}
-                    placeholder="pelajar@gapps.kpm.edu.my"
+                    placeholder="nama@gmail.com"
                     className={`w-full bg-slate-50 border rounded-xl pl-9 pr-3 py-2 text-xs font-medium focus:bg-white focus:outline-none transition-colors ${
                       formErrors.email 
                         ? 'border-rose-300 ring-2 ring-rose-500/10' 
@@ -386,12 +378,9 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
 
               {/* Field 5: No. Telefon WhatsApp (Auto Masking) */}
               <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-xs font-bold text-slate-700">
-                    No. Telefon WhatsApp <span className="text-rose-500">*</span>
-                  </label>
-                  <span className="text-[10px] text-emerald-700 font-mono font-bold">01X-XXXXXXX / 601X</span>
-                </div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  No. Telefon WhatsApp <span className="text-rose-500">*</span>
+                </label>
                 <div className="relative">
                   <input
                     type="tel"
@@ -408,13 +397,11 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
                   />
                   <Phone className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
                 </div>
-                {formErrors.phone ? (
+                {formErrors.phone && (
                   <p className="text-[11px] text-rose-600 font-bold mt-1 flex items-center gap-1">
                     <AlertCircle className="w-3 h-3 shrink-0" />
                     <span>{formErrors.phone}</span>
                   </p>
-                ) : (
-                  <span className="text-[10px] text-slate-400 block mt-0.5">Sistem memformatkan nombor secara langsung semasa menaip</span>
                 )}
               </div>
 
