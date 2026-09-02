@@ -250,6 +250,39 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
             </p>
           </div>
 
+          {/* Dynamic Countdown / Alert Banner */}
+          {hasActiveDeadline && deadlineRemaining ? (
+            /* Mode 1: Active Registration / Submission Deadline Alert (RED) */
+            <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 text-xs text-rose-900 flex items-start gap-3">
+              <ShieldAlert className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+              <div>
+                <div className="font-extrabold text-rose-700 uppercase tracking-wide text-[10px]">
+                  Peringatan Pendaftaran / Penyerahan
+                </div>
+                <div className="font-bold text-sm mt-0.5 text-rose-950">{deadlineRemaining}</div>
+                {deadlineIso && (
+                  <div className="text-slate-600 text-[11px] font-medium mt-0.5">
+                    Tarikh tutup: <span className="font-bold text-slate-800">{formatDeadlineMalay(deadlineIso)}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : isFutureEvent && eventStartRemaining ? (
+            /* Mode 2: Upcoming Event Start Countdown (BLUE) */
+            <div className="bg-sky-50 border border-sky-200 rounded-2xl p-4 text-xs text-sky-900 flex items-start gap-3">
+              <Clock className="w-5 h-5 text-sky-600 shrink-0 mt-0.5" />
+              <div>
+                <div className="font-extrabold text-sky-700 uppercase tracking-wide text-[10px]">
+                  Countdown Acara
+                </div>
+                <div className="font-bold text-sm mt-0.5 text-sky-950">{eventStartRemaining}</div>
+                <div className="text-slate-600 text-[11px] font-medium mt-0.5">
+                  Acara bermula: <span className="font-bold text-slate-800">{fullDateMalay}{event.startTime ? ` · ${event.startTime}` : ''}</span>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
           {/* Quick Info Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-50/80 border border-slate-200/80 rounded-2xl p-4 text-xs">
             {isOngoing ? (
@@ -342,39 +375,6 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
               </div>
             </div>
           </div>
-
-          {/* Dynamic Countdown / Alert Banner */}
-          {hasActiveDeadline && deadlineRemaining ? (
-            /* Mode 1: Active Registration / Submission Deadline Alert (RED) */
-            <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 text-xs text-rose-900 flex items-start gap-3">
-              <ShieldAlert className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
-              <div>
-                <div className="font-extrabold text-rose-700 uppercase tracking-wide text-[10px]">
-                  Peringatan Pendaftaran / Penyerahan
-                </div>
-                <div className="font-bold text-sm mt-0.5 text-rose-950">{deadlineRemaining}</div>
-                {deadlineIso && (
-                  <div className="text-slate-600 text-[11px] font-medium mt-0.5">
-                    Tarikh tutup: <span className="font-bold text-slate-800">{formatDeadlineMalay(deadlineIso)}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          ) : isFutureEvent && eventStartRemaining ? (
-            /* Mode 2: Upcoming Event Start Countdown (BLUE) */
-            <div className="bg-sky-50 border border-sky-200 rounded-2xl p-4 text-xs text-sky-900 flex items-start gap-3">
-              <Clock className="w-5 h-5 text-sky-600 shrink-0 mt-0.5" />
-              <div>
-                <div className="font-extrabold text-sky-700 uppercase tracking-wide text-[10px]">
-                  Countdown Acara
-                </div>
-                <div className="font-bold text-sm mt-0.5 text-sky-950">{eventStartRemaining}</div>
-                <div className="text-slate-600 text-[11px] font-medium mt-0.5">
-                  Acara bermula: <span className="font-bold text-slate-800">{fullDateMalay}{event.startTime ? ` · ${event.startTime}` : ''}</span>
-                </div>
-              </div>
-            </div>
-          ) : null}
 
           {/* Detailed Schedule & Session Breakdown (For ONGOING_PROGRAM) */}
           {isOngoing && event.scheduleSessions && event.scheduleSessions.length > 0 && (
