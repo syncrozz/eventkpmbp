@@ -976,11 +976,11 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                         const url = getEventShareUrl(evt);
                         navigator.clipboard.writeText(url);
                         if (onShowToast) {
-                          onShowToast(`Pautan ringkas disalin: #event-${getEventSlug(evt)}`);
+                          onShowToast(`Pautan ringkas disalin: #${getEventSlug(evt)}`);
                         }
                       }}
                       className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors"
-                      title={`Salin Pautan Ringkas (#event-${getEventSlug(evt)})`}
+                      title={`Salin Pautan Ringkas (#${getEventSlug(evt)})`}
                     >
                       <LinkIcon className="w-3.5 h-3.5" />
                     </button>

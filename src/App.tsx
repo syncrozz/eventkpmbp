@@ -125,21 +125,13 @@ export default function App() {
     };
   }, []);
 
-  // Deep-linking hash support: Automatically handle modal (#event-slug) and tab deep-links (#hantar-event, #kalendar, etc.)
+  // Deep-linking hash support: Automatically handle modal (#slug, #event-slug) and tab deep-links (#hantar-event, #kalendar, etc.)
   useEffect(() => {
     const handleHashCheck = () => {
       const hash = window.location.hash.toLowerCase().trim();
-      if (!hash) return;
+      if (!hash || hash === '#') return;
 
-      if (hash.startsWith('#event-')) {
-        const eventId = hash.replace('#event-', '').trim();
-        if (eventId) {
-          const found = findEventBySlugOrId(events, eventId);
-          if (found) {
-            setSelectedEventForDetail(found);
-          }
-        }
-      } else if (
+      if (
         hash === '#hantar-event' || 
         hash === '#submit-event' || 
         hash === '#hantar' || 
@@ -160,6 +152,21 @@ export default function App() {
           setCurrentTab('admin');
         } else {
           setIsAdminPinOpen(true);
+        }
+      } else if (hash === '#discover' || hash === '#utama' || hash === '#home') {
+        setCurrentTab('discover');
+      } else {
+        // Event deep-link lookup: supports both modern #<event-code> (e.g., #pmk020926) and legacy #event-<event-code>
+        const found = findEventBySlugOrId(events, hash);
+        if (found) {
+          setSelectedEventForDetail(found);
+          const canonicalSlug = getEventSlug(found);
+          // Seamlessly update URL in browser to canonical short hash format (#<event-code>)
+          if (window.location.hash !== `#${canonicalSlug}`) {
+            try {
+              window.history.replaceState(null, '', `#${canonicalSlug}`);
+            } catch {}
+          }
         }
       }
     };
@@ -191,34 +198,32 @@ export default function App() {
     } catch {}
   };
 
-  // Keep URL hash in sync with short slug when modal is opened / closed
+  // Keep URL hash in sync with short slug (#<event-code>) when modal is opened / closed
   const handleOpenDetailModal = (evt: KpmbpEvent) => {
     setSelectedEventForDetail(evt);
     try {
       const slug = getEventSlug(evt);
-      window.history.replaceState(null, '', `#event-${slug}`);
+      window.history.replaceState(null, '', `#${slug}`);
     } catch {}
   };
 
   const handleCloseDetailModal = () => {
     setSelectedEventForDetail(null);
     try {
-      if (window.location.hash.startsWith('#event-')) {
-        if (currentTab === 'submit-event') {
-          window.history.replaceState(null, '', '#hantar-event');
-        } else if (currentTab === 'events') {
-          window.history.replaceState(null, '', '#events');
-        } else if (currentTab === 'calendar') {
-          window.history.replaceState(null, '', '#kalendar');
-        } else if (currentTab === 'dont-miss') {
-          window.history.replaceState(null, '', '#jangan-terlepas');
-        } else if (currentTab === 'archive') {
-          window.history.replaceState(null, '', '#arkib');
-        } else if (currentTab === 'admin') {
-          window.history.replaceState(null, '', '#admin');
-        } else {
-          window.history.replaceState(null, '', window.location.pathname + window.location.search);
-        }
+      if (currentTab === 'submit-event') {
+        window.history.replaceState(null, '', '#hantar-event');
+      } else if (currentTab === 'events') {
+        window.history.replaceState(null, '', '#events');
+      } else if (currentTab === 'calendar') {
+        window.history.replaceState(null, '', '#kalendar');
+      } else if (currentTab === 'dont-miss') {
+        window.history.replaceState(null, '', '#jangan-terlepas');
+      } else if (currentTab === 'archive') {
+        window.history.replaceState(null, '', '#arkib');
+      } else if (currentTab === 'admin') {
+        window.history.replaceState(null, '', '#admin');
+      } else {
+        window.history.replaceState(null, '', window.location.pathname + window.location.search);
       }
     } catch {}
   };

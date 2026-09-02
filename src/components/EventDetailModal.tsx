@@ -593,7 +593,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
               </h3>
               {eventSlug && (
                 <span className="text-[10px] font-mono font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-100/80">
-                  #event-{eventSlug}
+                  #{eventSlug}
                 </span>
               )}
             </div>
@@ -606,7 +606,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                     ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
                     : 'bg-indigo-600 hover:bg-indigo-700 text-white'
                 }`}
-                title="Salin pautan ringkas acara ini untuk dikongsi (cth: #event-pmk020926)"
+                title="Salin pautan ringkas acara ini untuk dikongsi (cth: #pmk020926)"
               >
                 {copiedLink ? <Check className="w-4 h-4 text-emerald-700" /> : <LinkIcon className="w-4 h-4" />}
                 <span>{copiedLink ? 'Pautan Disalin!' : 'Salin Pautan Ringkas'}</span>

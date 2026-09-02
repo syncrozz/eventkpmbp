@@ -110,40 +110,46 @@ export function getEventSlug(event: KpmbpEvent): string {
 
 /**
  * Menghasilkan URL penuh perkongsian ringkas untuk acara.
- * Contoh: "https://eventkpmbp.syncrozz.com/#event-pmk020926"
+ * Contoh: "https://eventkpmbp.syncrozz.com/#pmk020926"
  */
 export function getEventShareUrl(event: KpmbpEvent, baseUrl?: string): string {
   const slug = getEventSlug(event);
   if (baseUrl) {
-    const cleanBase = baseUrl.split('#')[0];
-    return `${cleanBase}#event-${slug}`;
+    const cleanBase = baseUrl.split('#')[0].replace(/\/+$/, '');
+    return `${cleanBase}/#${slug}`;
   }
 
   if (typeof window !== 'undefined') {
-    return `${window.location.origin}${window.location.pathname}#event-${slug}`;
+    const origin = window.location.origin.replace(/\/+$/, '');
+    const pathname = window.location.pathname.startsWith('/') ? window.location.pathname : `/${window.location.pathname}`;
+    const pathWithTrailing = pathname.endsWith('/') ? pathname : `${pathname}/`;
+    return `${origin}${pathWithTrailing}#${slug}`;
   }
 
-  return `https://eventkpmbp.syncrozz.com/#event-${slug}`;
+  return `https://eventkpmbp.syncrozz.com/#${slug}`;
 }
 
 /**
- * Mencari acara dalam senarai sama ada melalui Slug Ringkas (cth: "pmk020926")
- * ATAU ID Asal Firestore / UUID (cth: "pPRvStNrTBDvJV5nfzUs").
+ * Mencari acara dalam senarai sama ada melalui Slug Ringkas (cth: "pmk020926"),
+ * format lama (cth: "event-pmk020926"), ATAU ID Asal Firestore / UUID (cth: "pPRvStNrTBDvJV5nfzUs").
  * Ini memastikan keserasian 100% dengan pautan lama dan pautan baharu.
  */
 export function findEventBySlugOrId(events: KpmbpEvent[], identifier: string): KpmbpEvent | undefined {
   if (!identifier || !Array.isArray(events) || events.length === 0) return undefined;
 
-  const clean = identifier
+  const raw = identifier.trim().toLowerCase();
+  // Strip leading '#' and backward-compatible 'event-' prefix
+  const clean = raw
     .replace(/^#event-/, '')
+    .replace(/^event-/, '')
     .replace(/^#/, '')
-    .trim()
-    .toLowerCase();
+    .trim();
 
   if (!clean) return undefined;
 
-  // 1. Padanan tepat ID
-  const matchId = events.find((e) => e.id.toLowerCase() === clean);
+  // 1. Padanan tepat ID (cth: "kpmbp-evt-001" atau "cPYcDm9d6vFmtkutJcEQ")
+  const rawWithoutHash = raw.replace(/^#/, '');
+  const matchId = events.find((e) => e.id.toLowerCase() === clean || e.id.toLowerCase() === rawWithoutHash);
   if (matchId) return matchId;
 
   // 2. Padanan tepat Slug Ringkas (cth: "pmk020926")
