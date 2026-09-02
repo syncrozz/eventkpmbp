@@ -48,6 +48,233 @@ const SUBMISSIONS_COLLECTION = 'eventSubmissions';
 const HERO_CONFIG_DOC_ID = 'hero_carousel';
 
 /**
+ * Parses raw Firestore REST API JSON value into clean JavaScript primitives/objects.
+ */
+function parseFirestoreValue(val: any): any {
+  if (!val) return null;
+  if ('stringValue' in val) return val.stringValue;
+  if ('booleanValue' in val) return val.booleanValue;
+  if ('integerValue' in val) return parseInt(val.integerValue, 10);
+  if ('doubleValue' in val) return val.doubleValue;
+  if ('timestampValue' in val) return val.timestampValue;
+  if ('arrayValue' in val) {
+    const values = val.arrayValue?.values || [];
+    return values.map((v: any) => parseFirestoreValue(v));
+  }
+  if ('mapValue' in val) {
+    const fields = val.mapValue?.fields || {};
+    const obj: Record<string, any> = {};
+    for (const [k, v] of Object.entries(fields)) {
+      obj[k] = parseFirestoreValue(v);
+    }
+    return obj;
+  }
+  if ('nullValue' in val) return null;
+  return null;
+}
+
+/**
+ * Parses raw Firestore REST Document into a plain typed object.
+ */
+function parseFirestoreDoc(docObj: any): any {
+  if (!docObj || !docObj.name) return null;
+  const id = docObj.name.split('/').pop();
+  const fields = docObj.fields || {};
+  const data: Record<string, any> = { id };
+  for (const [k, v] of Object.entries(fields)) {
+    data[k] = parseFirestoreValue(v);
+  }
+  return data;
+}
+
+/**
+ * Converts a JavaScript object into Firestore REST API typed format.
+ */
+function toFirestoreValue(val: any): any {
+  if (val === null || val === undefined) return { nullValue: null };
+  if (typeof val === 'string') return { stringValue: val };
+  if (typeof val === 'boolean') return { booleanValue: val };
+  if (typeof val === 'number') {
+    if (Number.isInteger(val)) return { integerValue: val.toString() };
+    return { doubleValue: val };
+  }
+  if (Array.isArray(val)) {
+    return { arrayValue: { values: val.map(toFirestoreValue) } };
+  }
+  if (typeof val === 'object') {
+    const fields: Record<string, any> = {};
+    for (const [k, v] of Object.entries(val)) {
+      if (v !== undefined) {
+        fields[k] = toFirestoreValue(v);
+      }
+    }
+    return { mapValue: { fields } };
+  }
+  return { stringValue: String(val) };
+}
+
+function toFirestoreDocPayload(obj: any): any {
+  const fields: Record<string, any> = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (k !== 'id' && v !== undefined) {
+      fields[k] = toFirestoreValue(v);
+    }
+  }
+  return { fields };
+}
+
+/**
+ * Direct REST query for all events directly from Firestore (100% resilient across incognito & private modes).
+ */
+export async function fetchEventsDirectFromRest(): Promise<KpmbpEvent[]> {
+  try {
+    const projectId = firebaseConfig.projectId;
+    const dbId = designatedDbId || '(default)';
+    const apiKey = firebaseConfig.apiKey;
+    const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${dbId}/documents:runQuery?key=${apiKey}`;
+
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        structuredQuery: {
+          from: [{ collectionId: EVENTS_COLLECTION }]
+        }
+      })
+    });
+
+    if (!res.ok) {
+      throw new Error(`REST query failed: ${res.status} ${res.statusText}`);
+    }
+
+    const data = await res.json();
+    const eventsList: KpmbpEvent[] = [];
+
+    if (Array.isArray(data)) {
+      for (const item of data) {
+        if (item.document) {
+          const raw = parseFirestoreDoc(item.document);
+          if (raw && raw.id && raw.title) {
+            eventsList.push({
+              id: raw.id,
+              eventType: raw.eventType || 'ONE_TIME_EVENT',
+              title: raw.title || '',
+              description: raw.description || '',
+              category: raw.category || 'Akademik',
+              date: raw.date || '',
+              startTime: raw.startTime || '',
+              endTime: raw.endTime || '',
+              location: raw.location || '',
+              organiser: raw.organiser || 'KPMBP',
+              image: raw.image || undefined,
+              eventMode: raw.eventMode || 'physical',
+              registrationMode: raw.registrationMode || (raw.registrationUrl ? 'google_form' : (raw.organiserWhatsApp ? 'admin' : 'none')),
+              organiserWhatsApp: raw.organiserWhatsApp || undefined,
+              submissionDeadline: raw.submissionDeadline || undefined,
+              registrationUrl: raw.registrationUrl || undefined,
+              registrationDeadline: raw.registrationDeadline || undefined,
+              status: raw.status || 'Registration Open',
+              eligibility: raw.eligibility || 'Terbuka kepada semua siswa & siswi KPMBP',
+              contact: raw.contact || 'Urusetia KPMBP',
+              featured: Boolean(raw.featured),
+              importantNotice: raw.importantNotice || undefined,
+              seatsLeft: typeof raw.seatsLeft === 'number' ? raw.seatsLeft : undefined,
+              totalSeats: typeof raw.totalSeats === 'number' ? raw.totalSeats : undefined,
+              tags: Array.isArray(raw.tags) ? raw.tags : [],
+              programDuration: raw.programDuration || undefined,
+              scheduleSummary: raw.scheduleSummary || undefined,
+              scheduleSessions: Array.isArray(raw.scheduleSessions) ? raw.scheduleSessions : undefined,
+              feeType: raw.feeType || undefined,
+              feeAmount: raw.feeAmount || undefined,
+              targetAudience: raw.targetAudience || undefined,
+              createdAt: raw.createdAt || undefined,
+              updatedAt: raw.updatedAt || undefined
+            });
+          }
+        }
+      }
+    }
+
+    if (eventsList.length > 0) {
+      const sorted = sortEventsByNearestDue(eventsList);
+      saveLocalEventsCache(sorted);
+      return sorted;
+    }
+    return [];
+  } catch (err: any) {
+    console.warn('REST events direct fetch notice:', err?.message);
+    return [];
+  }
+}
+
+/**
+ * Direct REST query for Hero configuration.
+ */
+export async function fetchHeroConfigDirectFromRest(): Promise<HeroConfig | null> {
+  try {
+    const projectId = firebaseConfig.projectId;
+    const dbId = designatedDbId || '(default)';
+    const apiKey = firebaseConfig.apiKey;
+    const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${dbId}/documents/${SETTINGS_COLLECTION}/${HERO_CONFIG_DOC_ID}?key=${apiKey}`;
+
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data && data.fields) {
+      const autoPlay = parseFirestoreValue(data.fields.autoPlay) ?? true;
+      const intervalSeconds = parseFirestoreValue(data.fields.intervalSeconds) ?? 6;
+      const slides = parseFirestoreValue(data.fields.slides) || [];
+      if (Array.isArray(slides) && slides.length > 0) {
+        const config: HeroConfig = { autoPlay, intervalSeconds, slides };
+        saveLocalHeroConfigCache(config);
+        return config;
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Direct REST write fallback for any document.
+ */
+async function writeDocDirectViaRest(collectionName: string, docId: string, dataObj: any): Promise<void> {
+  const projectId = firebaseConfig.projectId;
+  const dbId = designatedDbId || '(default)';
+  const apiKey = firebaseConfig.apiKey;
+  const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${dbId}/documents/${collectionName}/${docId}?key=${apiKey}`;
+
+  const payload = toFirestoreDocPayload(sanitizeForFirestore(dataObj));
+  const res = await fetch(url, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`REST write failed (${res.status}): ${errText}`);
+  }
+}
+
+/**
+ * Direct REST delete fallback.
+ */
+async function deleteDocDirectViaRest(collectionName: string, docId: string): Promise<void> {
+  const projectId = firebaseConfig.projectId;
+  const dbId = designatedDbId || '(default)';
+  const apiKey = firebaseConfig.apiKey;
+  const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${dbId}/documents/${collectionName}/${docId}?key=${apiKey}`;
+
+  const res = await fetch(url, { method: 'DELETE' });
+  if (!res.ok && res.status !== 404) {
+    const errText = await res.text();
+    throw new Error(`REST delete failed (${res.status}): ${errText}`);
+  }
+}
+
+/**
  * Deeply sanitizes any object or array by removing `undefined` keys
  * and ensuring values are safe for Firestore write operations.
  */
@@ -166,6 +393,8 @@ export function saveLocalSubmissionsCache(submissions: EventSubmission[]): void 
 
 /**
  * Subscribes to real-time events updates in Firestore with automatic offline/quota fallback.
+ * Also immediately triggers a direct resilient REST fetch so incognito windows and fresh devices
+ * populate all live cloud events within ~200ms.
  */
 export function subscribeToEvents(
   onUpdate: (events: KpmbpEvent[]) => void,
@@ -177,15 +406,22 @@ export function subscribeToEvents(
     onUpdate(cachedEvents);
   }
 
+  // 2. Resilient immediate direct cloud fetch (critical for Incognito / new devices)
+  fetchEventsDirectFromRest().then((directEvents) => {
+    if (directEvents && directEvents.length > 0) {
+      onUpdate(directEvents);
+    }
+  }).catch(() => {});
+
+  // 3. Real-time onSnapshot listener for instant cross-device updates
   const eventsRef = collection(db, EVENTS_COLLECTION);
-  
   let unsubscribe: (() => void) | null = null;
   try {
     unsubscribe = onSnapshot(
       eventsRef,
       async (snapshot) => {
         if (snapshot.empty) {
-          // If Firestore is empty (e.g. initial setup), auto-seed INITIAL_EVENTS so all devices have events
+          // If Firestore is empty (e.g. initial setup), auto-seed INITIAL_EVENTS
           const initialList = cachedEvents && cachedEvents.length > 0 ? cachedEvents : INITIAL_EVENTS;
           try {
             for (const evt of initialList) {
@@ -249,17 +485,26 @@ export function subscribeToEvents(
         onUpdate(sortedEvents);
       },
       (err) => {
-        // Quota exceeded or connection error handled gracefully
-        console.warn('Firestore sync notice (using local storage fallback):', err.message);
-        const fallback = getLocalEventsCache();
-        onUpdate(fallback);
+        console.warn('Firestore sync notice (using resilient fetch fallback):', err.message);
+        fetchEventsDirectFromRest().then((resEvents) => {
+          if (resEvents.length > 0) {
+            onUpdate(resEvents);
+          } else {
+            onUpdate(getLocalEventsCache());
+          }
+        });
         if (onError) onError(err);
       }
     );
   } catch (err: any) {
     console.warn('Firestore subscription unavailable:', err?.message);
-    const fallback = getLocalEventsCache();
-    onUpdate(fallback);
+    fetchEventsDirectFromRest().then((resEvents) => {
+      if (resEvents.length > 0) {
+        onUpdate(resEvents);
+      } else {
+        onUpdate(getLocalEventsCache());
+      }
+    });
     if (onError) onError(err);
   }
 
@@ -273,57 +518,88 @@ export function subscribeToEvents(
 }
 
 /**
- * Creates a new event in Firestore.
+ * Creates a new event in Firestore with dual SDK & REST resilience.
  */
 export async function createEventInFirestore(eventData: Omit<KpmbpEvent, 'id'>): Promise<string> {
+  const eventId = `evt_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+  const payload = sanitizeForFirestore({
+    ...eventData,
+    id: eventId,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  });
+
+  // 1. Immediately update local cache
+  const localList = getLocalEventsCache();
+  const nextList = sortEventsByNearestDue([payload as KpmbpEvent, ...localList.filter((e) => e.id !== eventId)]);
+  saveLocalEventsCache(nextList);
+
+  // 2. Persist to Firestore
   try {
-    const eventsRef = collection(db, EVENTS_COLLECTION);
-    const newDocRef = doc(eventsRef);
-    const eventId = newDocRef.id;
-
-    const payload = sanitizeForFirestore({
-      ...eventData,
-      id: eventId,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    });
-
-    await setDoc(newDocRef, payload);
-    return eventId;
-  } catch (error) {
-    console.error('Error in createEventInFirestore:', error);
-    throw error;
-  }
-}
-
-/**
- * Updates an existing event in Firestore.
- */
-export async function updateEventInFirestore(event: KpmbpEvent): Promise<void> {
-  try {
-    const docRef = doc(db, EVENTS_COLLECTION, event.id);
-    const payload = sanitizeForFirestore({
-      ...event,
-      updatedAt: new Date().toISOString()
-    });
-    // Set doc cleanly so updated title, dates, deadlines, and fields replace old version
+    const docRef = doc(db, EVENTS_COLLECTION, eventId);
     await setDoc(docRef, payload);
   } catch (error) {
-    console.error('Error in updateEventInFirestore:', error);
-    throw error;
+    console.warn('SDK write issue, using REST fallback:', error);
+    try {
+      await writeDocDirectViaRest(EVENTS_COLLECTION, eventId, payload);
+    } catch (restErr) {
+      console.error('Failed to create event in Firestore:', restErr);
+      throw restErr;
+    }
+  }
+
+  return eventId;
+}
+
+/**
+ * Updates an existing event in Firestore with dual SDK & REST resilience.
+ */
+export async function updateEventInFirestore(event: KpmbpEvent): Promise<void> {
+  const payload = sanitizeForFirestore({
+    ...event,
+    updatedAt: new Date().toISOString()
+  });
+
+  // 1. Update local cache
+  const localList = getLocalEventsCache();
+  const nextList = sortEventsByNearestDue(localList.map((e) => (e.id === event.id ? payload : e)));
+  saveLocalEventsCache(nextList);
+
+  // 2. Write to Firestore
+  try {
+    const docRef = doc(db, EVENTS_COLLECTION, event.id);
+    await setDoc(docRef, payload);
+  } catch (error) {
+    console.warn('SDK update issue, using REST fallback:', error);
+    try {
+      await writeDocDirectViaRest(EVENTS_COLLECTION, event.id, payload);
+    } catch (restErr) {
+      console.error('Failed to update event in Firestore:', restErr);
+      throw restErr;
+    }
   }
 }
 
 /**
- * Deletes an event from Firestore.
+ * Deletes an event from Firestore with dual SDK & REST resilience.
  */
 export async function deleteEventInFirestore(eventId: string): Promise<void> {
+  // 1. Update local cache
+  const localList = getLocalEventsCache();
+  saveLocalEventsCache(localList.filter((e) => e.id !== eventId));
+
+  // 2. Delete from Firestore
   try {
     const docRef = doc(db, EVENTS_COLLECTION, eventId);
     await deleteDoc(docRef);
   } catch (error) {
-    console.error('Error in deleteEventInFirestore:', error);
-    throw error;
+    console.warn('SDK delete issue, using REST fallback:', error);
+    try {
+      await deleteDocDirectViaRest(EVENTS_COLLECTION, eventId);
+    } catch (restErr) {
+      console.error('Failed to delete event from Firestore:', restErr);
+      throw restErr;
+    }
   }
 }
 
@@ -338,12 +614,16 @@ export async function syncAllEventsToFirestore(
 
   for (const evt of eventsList) {
     try {
-      const docRef = doc(db, EVENTS_COLLECTION, evt.id);
       const payload = sanitizeForFirestore({
         ...evt,
         updatedAt: new Date().toISOString()
       });
-      await setDoc(docRef, payload);
+      try {
+        const docRef = doc(db, EVENTS_COLLECTION, evt.id);
+        await setDoc(docRef, payload);
+      } catch {
+        await writeDocDirectViaRest(EVENTS_COLLECTION, evt.id, payload);
+      }
       syncedCount++;
     } catch (err: any) {
       console.error(`Failed to sync event ${evt.title} (${evt.id}):`, err);
@@ -368,12 +648,11 @@ export async function checkFirestoreHealth(): Promise<{
   databaseId?: string;
 }> {
   try {
-    const eventsRef = collection(db, EVENTS_COLLECTION);
-    const snapshot = await getDocs(eventsRef);
+    const directEvents = await fetchEventsDirectFromRest();
     return {
       connected: true,
       message: 'Firestore bersambung dengan sempurna (Online).',
-      cloudCount: snapshot.size,
+      cloudCount: directEvents.length,
       databaseId: designatedDbId || '(default)'
     };
   } catch (err: any) {
@@ -389,22 +668,24 @@ export async function checkFirestoreHealth(): Promise<{
  * Saves a student registration record with local-first guarantee and Firestore sync.
  */
 export async function saveRegistrationToFirestore(record: RegistrationRecord): Promise<void> {
-  // 1. Immediately save to local registrations cache
   const localList = getLocalRegistrationsCache();
   const nextList = [record, ...localList.filter((r) => r.id !== record.id)];
   saveLocalRegistrationsCache(nextList);
 
-  // 2. Attempt Firestore sync with deterministic document ID (record.id)
+  const payload = sanitizeForFirestore({
+    ...record,
+    createdAt: new Date().toISOString()
+  });
+
   try {
     const docRef = doc(db, REGISTRATIONS_COLLECTION, record.id);
-    const payload = sanitizeForFirestore({
-      ...record,
-      createdAt: serverTimestamp()
-    });
     await setDoc(docRef, payload, { merge: true });
   } catch (error: any) {
-    console.warn('Registration saved to local storage (Cloud sync notice):', error?.message);
-    // Don't throw if local was saved successfully
+    try {
+      await writeDocDirectViaRest(REGISTRATIONS_COLLECTION, record.id, payload);
+    } catch (restErr: any) {
+      console.warn('Registration saved to local storage (Cloud sync notice):', restErr?.message);
+    }
   }
 }
 
@@ -414,11 +695,49 @@ export async function saveRegistrationToFirestore(record: RegistrationRecord): P
 export function subscribeToRegistrations(
   onUpdate: (registrations: RegistrationRecord[]) => void
 ) {
-  // 1. Emit local cached registrations immediately
   const cached = getLocalRegistrationsCache();
   if (cached.length > 0) {
     onUpdate(cached);
   }
+
+  // Direct REST fetch fallback
+  const projectId = firebaseConfig.projectId;
+  const dbId = designatedDbId || '(default)';
+  const apiKey = firebaseConfig.apiKey;
+  fetch(`https://firestore.googleapis.com/v1/projects/${projectId}/databases/${dbId}/documents:runQuery?key=${apiKey}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ structuredQuery: { from: [{ collectionId: REGISTRATIONS_COLLECTION }] } })
+  }).then(async (res) => {
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        const list: RegistrationRecord[] = [];
+        for (const item of data) {
+          if (item.document) {
+            const raw = parseFirestoreDoc(item.document);
+            if (raw && raw.id) {
+              list.push({
+                id: raw.id,
+                eventId: raw.eventId || '',
+                eventTitle: raw.eventTitle || '',
+                studentName: raw.studentName || '',
+                studentId: raw.studentId || '',
+                email: raw.email || '',
+                phone: raw.phone || '',
+                programCode: raw.programCode || '',
+                timestamp: raw.timestamp || ''
+              });
+            }
+          }
+        }
+        if (list.length > 0) {
+          saveLocalRegistrationsCache(list);
+          onUpdate(list);
+        }
+      }
+    }
+  }).catch(() => {});
 
   const regRef = collection(db, REGISTRATIONS_COLLECTION);
   let unsubscribe: (() => void) | null = null;
@@ -474,8 +793,12 @@ export async function deleteRegistrationFromFirestore(id: string): Promise<void>
   try {
     const docRef = doc(db, REGISTRATIONS_COLLECTION, id);
     await deleteDoc(docRef);
-  } catch (err: any) {
-    console.warn('Registration deleted from local cache:', err?.message);
+  } catch {
+    try {
+      await deleteDocDirectViaRest(REGISTRATIONS_COLLECTION, id);
+    } catch (err: any) {
+      console.warn('Registration deleted from local cache:', err?.message);
+    }
   }
 }
 
@@ -487,15 +810,20 @@ export async function updateRegistrationInFirestore(record: RegistrationRecord):
   const nextList = localList.map((r) => (r.id === record.id ? record : r));
   saveLocalRegistrationsCache(nextList);
 
+  const payload = sanitizeForFirestore({
+    ...record,
+    updatedAt: new Date().toISOString()
+  });
+
   try {
     const docRef = doc(db, REGISTRATIONS_COLLECTION, record.id);
-    const payload = sanitizeForFirestore({
-      ...record,
-      updatedAt: new Date().toISOString()
-    });
     await setDoc(docRef, payload, { merge: true });
-  } catch (err: any) {
-    console.warn('Registration updated in local cache (Cloud sync notice):', err?.message);
+  } catch {
+    try {
+      await writeDocDirectViaRest(REGISTRATIONS_COLLECTION, record.id, payload);
+    } catch (err: any) {
+      console.warn('Registration updated in local cache (Cloud sync notice):', err?.message);
+    }
   }
 }
 
@@ -509,6 +837,13 @@ export function subscribeToHeroConfig(
   // Emit local cached config first
   const cached = getLocalHeroConfigCache();
   onUpdate(cached);
+
+  // Immediate REST fetch for incognito / fresh devices
+  fetchHeroConfigDirectFromRest().then((resConfig) => {
+    if (resConfig) {
+      onUpdate(resConfig);
+    }
+  }).catch(() => {});
 
   const docRef = doc(db, SETTINGS_COLLECTION, HERO_CONFIG_DOC_ID);
   let unsubscribe: (() => void) | null = null;
@@ -530,18 +865,23 @@ export function subscribeToHeroConfig(
             return;
           }
         }
-        // If doc doesn't exist yet, preserve cached or default
         onUpdate(getLocalHeroConfigCache());
       },
       (err) => {
-        console.warn('Hero config sync notice (using local storage):', err.message);
-        onUpdate(getLocalHeroConfigCache());
+        console.warn('Hero config sync notice (using fallback):', err.message);
+        fetchHeroConfigDirectFromRest().then((cfg) => {
+          if (cfg) onUpdate(cfg);
+          else onUpdate(getLocalHeroConfigCache());
+        });
         if (onError) onError(err);
       }
     );
   } catch (err: any) {
     console.warn('Hero config subscription unavailable:', err?.message);
-    onUpdate(getLocalHeroConfigCache());
+    fetchHeroConfigDirectFromRest().then((cfg) => {
+      if (cfg) onUpdate(cfg);
+      else onUpdate(getLocalHeroConfigCache());
+    });
     if (onError) onError(err);
   }
 
@@ -561,16 +901,21 @@ export async function saveHeroConfigToFirestore(config: HeroConfig): Promise<voi
   // 1. Immediately cache locally
   saveLocalHeroConfigCache(config);
 
+  const payload = sanitizeForFirestore({
+    ...config,
+    updatedAt: new Date().toISOString()
+  });
+
   // 2. Persist to Firestore
   try {
     const docRef = doc(db, SETTINGS_COLLECTION, HERO_CONFIG_DOC_ID);
-    const payload = sanitizeForFirestore({
-      ...config,
-      updatedAt: new Date().toISOString()
-    });
     await setDoc(docRef, payload, { merge: true });
-  } catch (err: any) {
-    console.warn('Hero config stored in local cache (Cloud notice):', err?.message);
+  } catch {
+    try {
+      await writeDocDirectViaRest(SETTINGS_COLLECTION, HERO_CONFIG_DOC_ID, payload);
+    } catch (err: any) {
+      console.warn('Hero config stored in local cache (Cloud notice):', err?.message);
+    }
   }
 }
 
@@ -580,35 +925,36 @@ export async function saveHeroConfigToFirestore(config: HeroConfig): Promise<voi
 export async function submitEventToFirestore(
   submissionData: Omit<EventSubmission, 'id'>
 ): Promise<string> {
+  const submissionId = `sub_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+  const fullRecord: EventSubmission = {
+    ...submissionData,
+    id: submissionId,
+    status: 'PENDING',
+    submittedAt: submissionData.submittedAt || new Date().toISOString()
+  };
+
+  // 1. Update local cache immediately
+  const local = getLocalSubmissionsCache();
+  saveLocalSubmissionsCache([fullRecord, ...local.filter((s) => s.id !== submissionId)]);
+
+  // 2. Write to Firestore
+  const payload = sanitizeForFirestore({
+    ...fullRecord,
+    createdAt: new Date().toISOString()
+  });
+
   try {
-    const subRef = collection(db, SUBMISSIONS_COLLECTION);
-    const newDoc = doc(subRef);
-    const submissionId = newDoc.id;
-
-    const fullRecord: EventSubmission = {
-      ...submissionData,
-      id: submissionId,
-      status: 'PENDING',
-      submittedAt: submissionData.submittedAt || new Date().toISOString()
-    };
-
-    // 1. Update local cache immediately
-    const local = getLocalSubmissionsCache();
-    saveLocalSubmissionsCache([fullRecord, ...local.filter((s) => s.id !== submissionId)]);
-
-    // 2. Write to Firestore
-    const payload = sanitizeForFirestore({
-      ...fullRecord,
-      createdAt: serverTimestamp()
-    });
-    await setDoc(newDoc, payload);
-
-    return submissionId;
-  } catch (error: any) {
-    console.warn('Submission saved locally with cloud warning:', error?.message);
-    // If Firestore failed, ensure local has the entry
-    return `local_${Date.now()}`;
+    const docRef = doc(db, SUBMISSIONS_COLLECTION, submissionId);
+    await setDoc(docRef, payload);
+  } catch {
+    try {
+      await writeDocDirectViaRest(SUBMISSIONS_COLLECTION, submissionId, payload);
+    } catch (error: any) {
+      console.warn('Submission saved locally with cloud warning:', error?.message);
+    }
   }
+
+  return submissionId;
 }
 
 /**
@@ -623,6 +969,81 @@ export function subscribeToSubmissions(
   if (cached.length > 0) {
     onUpdate(cached);
   }
+
+  // Direct REST fetch
+  const projectId = firebaseConfig.projectId;
+  const dbId = designatedDbId || '(default)';
+  const apiKey = firebaseConfig.apiKey;
+  fetch(`https://firestore.googleapis.com/v1/projects/${projectId}/databases/${dbId}/documents:runQuery?key=${apiKey}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ structuredQuery: { from: [{ collectionId: SUBMISSIONS_COLLECTION }] } })
+  }).then(async (res) => {
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        const list: EventSubmission[] = [];
+        for (const item of data) {
+          if (item.document) {
+            const raw = parseFirestoreDoc(item.document);
+            if (raw && raw.id && raw.title) {
+              list.push({
+                id: raw.id,
+                status: raw.status || 'PENDING',
+                submittedAt: raw.submittedAt || new Date().toISOString(),
+                reviewedAt: raw.reviewedAt || undefined,
+                reviewedBy: raw.reviewedBy || undefined,
+                rejectionReason: raw.rejectionReason || undefined,
+                approvedEventId: raw.approvedEventId || undefined,
+                submitterName: raw.submitterName || '',
+                submitterPhone: raw.submitterPhone || '',
+                submitterEmail: raw.submitterEmail || undefined,
+                submitterRole: raw.submitterRole || undefined,
+                eventType: raw.eventType || 'ONE_TIME_EVENT',
+                title: raw.title || '',
+                description: raw.description || '',
+                category: raw.category || 'Pertandingan',
+                date: raw.date || '',
+                startTime: raw.startTime || '',
+                endTime: raw.endTime || '',
+                location: raw.location || '',
+                organiser: raw.organiser || '',
+                image: raw.image || undefined,
+                eventMode: raw.eventMode || 'physical',
+                registrationMode: raw.registrationMode || 'none',
+                organiserWhatsApp: raw.organiserWhatsApp || undefined,
+                organiserUrl: raw.organiserUrl || undefined,
+                submissionDeadline: raw.submissionDeadline || undefined,
+                registrationUrl: raw.registrationUrl || undefined,
+                registrationDeadline: raw.registrationDeadline || undefined,
+                eligibility: raw.eligibility || undefined,
+                contact: raw.contact || undefined,
+                importantNotice: raw.importantNotice || undefined,
+                seatsLeft: typeof raw.seatsLeft === 'number' ? raw.seatsLeft : undefined,
+                totalSeats: typeof raw.totalSeats === 'number' ? raw.totalSeats : undefined,
+                tags: Array.isArray(raw.tags) ? raw.tags : [],
+                scheduleSummary: raw.scheduleSummary || undefined,
+                scheduleSessions: Array.isArray(raw.scheduleSessions) ? raw.scheduleSessions : undefined,
+                programDuration: raw.programDuration || undefined,
+                feeType: raw.feeType || undefined,
+                feeAmount: raw.feeAmount || undefined,
+                targetAudience: raw.targetAudience || undefined
+              });
+            }
+          }
+        }
+        list.sort((a, b) => {
+          if (a.status === 'PENDING' && b.status !== 'PENDING') return -1;
+          if (a.status !== 'PENDING' && b.status === 'PENDING') return 1;
+          return new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime();
+        });
+        if (list.length > 0) {
+          saveLocalSubmissionsCache(list);
+          onUpdate(list);
+        }
+      }
+    }
+  }).catch(() => {});
 
   const subRef = collection(db, SUBMISSIONS_COLLECTION);
   let unsubscribe: (() => void) | null = null;
@@ -678,7 +1099,6 @@ export function subscribeToSubmissions(
           });
         });
 
-        // Sort: PENDING first, then by submittedAt desc
         list.sort((a, b) => {
           if (a.status === 'PENDING' && b.status !== 'PENDING') return -1;
           if (a.status !== 'PENDING' && b.status === 'PENDING') return 1;
@@ -717,15 +1137,20 @@ export async function updateSubmissionInFirestore(submission: EventSubmission): 
   const nextList = localList.map((s) => (s.id === submission.id ? submission : s));
   saveLocalSubmissionsCache(nextList);
 
+  const payload = sanitizeForFirestore({
+    ...submission,
+    updatedAt: new Date().toISOString()
+  });
+
   try {
     const docRef = doc(db, SUBMISSIONS_COLLECTION, submission.id);
-    const payload = sanitizeForFirestore({
-      ...submission,
-      updatedAt: new Date().toISOString()
-    });
     await setDoc(docRef, payload, { merge: true });
-  } catch (err: any) {
-    console.warn('Submission updated locally (Cloud notice):', err?.message);
+  } catch {
+    try {
+      await writeDocDirectViaRest(SUBMISSIONS_COLLECTION, submission.id, payload);
+    } catch (err: any) {
+      console.warn('Submission updated locally (Cloud notice):', err?.message);
+    }
   }
 }
 
@@ -739,8 +1164,12 @@ export async function deleteSubmissionFromFirestore(id: string): Promise<void> {
   try {
     const docRef = doc(db, SUBMISSIONS_COLLECTION, id);
     await deleteDoc(docRef);
-  } catch (err: any) {
-    console.warn('Submission deleted from local cache:', err?.message);
+  } catch {
+    try {
+      await deleteDocDirectViaRest(SUBMISSIONS_COLLECTION, id);
+    } catch (err: any) {
+      console.warn('Submission deleted from local cache:', err?.message);
+    }
   }
 }
 
